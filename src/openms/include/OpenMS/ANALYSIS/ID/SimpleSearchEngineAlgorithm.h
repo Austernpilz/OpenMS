@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -38,6 +12,7 @@
 #include <OpenMS/CHEMISTRY/ModifiedPeptideGenerator.h>
 #include <OpenMS/KERNEL/MSExperiment.h>
 #include <OpenMS/DATASTRUCTURES/StringView.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 
 #include <vector>
 
@@ -65,7 +40,7 @@ class OPENMS_DLLAPI SimpleSearchEngineAlgorithm :
     ExitCodes search(const String& in_mzML, 
       const String& in_db, 
       std::vector<ProteinIdentification>& prot_ids,
-      std::vector<PeptideIdentification>& pep_ids) const;
+      PeptideIdentificationList& pep_ids) const;
   protected:
     void updateMembers_() override;
 
@@ -75,10 +50,11 @@ class OPENMS_DLLAPI SimpleSearchEngineAlgorithm :
       StringView sequence;
       SignedSize peptide_mod_index; ///< enumeration index of the non-RNA peptide modification
       double score = 0; ///< main score
-      std::vector<PeptideHit::PeakAnnotation> fragment_annotations;      
       double prefix_fraction = 0; ///< fraction of annotated b-ions
       double suffix_fraction = 0; ///< fraction of annotated y-ions
       double mean_error = 0.0; ///< mean absolute fragment mass error
+      int isotope_error = 0;
+      std::vector<PeptideHit::PeakAnnotation> fragment_annotations;
 
       static bool hasBetterScore(const AnnotatedHit_& a, const AnnotatedHit_& b)
       {
@@ -98,7 +74,7 @@ class OPENMS_DLLAPI SimpleSearchEngineAlgorithm :
     void postProcessHits_(const PeakMap& exp, 
       std::vector<std::vector<SimpleSearchEngineAlgorithm::AnnotatedHit_> >& annotated_hits, 
       std::vector<ProteinIdentification>& protein_ids, 
-      std::vector<PeptideIdentification>& peptide_ids, 
+      PeptideIdentificationList& peptide_ids, 
       Size top_hits,
       const ModifiedPeptideGenerator::MapToResidueType& fixed_modifications,
       const ModifiedPeptideGenerator::MapToResidueType& variable_modifications,

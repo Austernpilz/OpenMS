@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -37,10 +11,7 @@
 #include <OpenMS/ANALYSIS/ID/AccurateMassSearchEngine.h>// for AMS annotation
 #include <OpenMS/ANALYSIS/ID/IDMapper.h>
 #include <OpenMS/DATASTRUCTURES/OSWData.h>
-#include <OpenMS/FORMAT/FeatureXMLFile.h>
 #include <OpenMS/FORMAT/FileHandler.h>
-#include <OpenMS/FORMAT/IdXMLFile.h>
-#include <OpenMS/FORMAT/MzIdentMLFile.h>
 #include <OpenMS/FORMAT/OSWFile.h>
 #include <OpenMS/VISUAL/ANNOTATION/Annotation1DPeakItem.h>
 #include <OpenMS/VISUAL/LayerDataConsensus.h>
@@ -82,7 +53,42 @@ namespace OpenMS
     return n;
   }
 
-  bool LayerDataBase::annotate(const vector<PeptideIdentification>& identifications,
+  /*
+  void LayerDataBase::updateCache_()
+  {
+    if (peak_map_->getMSExperiment().getNrSpectra() > current_spectrum_idx_ && !(*peak_map_)[current_spectrum_idx_].first.empty())
+    {
+      cached_spectrum_ = (*peak_map_)[current_spectrum_idx_].first;
+    }
+    else if (on_disc_peaks->getNrSpectra() > current_spectrum_idx_)
+    {
+      cached_spectrum_ = on_disc_peaks->getSpectrum(current_spectrum_idx_);
+    }
+  }
+
+
+  /// add annotation from an OSW sqlite file.
+
+
+  /// get annotation (e.g. to build a hierachical ID View)
+  /// Not const, because we might have incomplete data, which needs to be loaded from sql source
+
+  LayerDataBase::OSWDataSharedPtrType& LayerDataBase::getChromatogramAnnotation()
+  {
+    return chrom_annotation_;
+  }
+
+  const LayerDataBase::OSWDataSharedPtrType& LayerDataBase::getChromatogramAnnotation() const
+  {
+    return chrom_annotation_;
+  }
+
+  void LayerDataBase::setChromatogramAnnotation(OSWData&& data)
+  {
+    chrom_annotation_ = OSWDataSharedPtrType(new OSWData(std::move(data)));
+  }
+*/
+  bool LayerDataBase::annotate(const PeptideIdentificationList& identifications,
                            const vector<ProteinIdentification>& protein_identifications)
   {
     IDMapper mapper;
@@ -111,15 +117,30 @@ namespace OpenMS
     return false;
   }
 
-
   float LayerDataBase::getMinIntensity() const
   {
-    return getRange().getMinIntensity();
+    if (!getRange().RangeIntensity::isEmpty())
+    {
+      return getRange().getMinIntensity();
+    }
+    else
+    {
+      OPENMS_LOG_WARN << "No data in range to get min intensity from. Returning 0.0." << std::endl;
+      return 0.0f;
+    }
   }
 
   float LayerDataBase::getMaxIntensity() const
   {
-    return getRange().getMaxIntensity();
+    if (!getRange().RangeIntensity::isEmpty())
+    {
+      return getRange().getMaxIntensity();
+    }
+    else
+    {
+      OPENMS_LOG_WARN << "No data in range to get max intensity from. Returning 0.0." << std::endl;
+      return 0.0f;
+    }
   }
 
   LayerAnnotatorBase::LayerAnnotatorBase(const FileTypeList& supported_types, const String& file_dialog_text, QWidget* gui_lock) :
@@ -202,17 +223,9 @@ namespace OpenMS
   bool LayerAnnotatorPeptideID::annotateWorker_(LayerDataBase& layer, const String& filename, LogWindow& /*log*/) const
   {
     FileTypes::Type type = FileHandler::getType(filename);
-    vector<PeptideIdentification> identifications;
+    PeptideIdentificationList identifications;
     vector<ProteinIdentification> protein_identifications;
-    if (type == FileTypes::MZIDENTML)
-    {
-      MzIdentMLFile().load(filename, protein_identifications, identifications);
-    }
-    else
-    {
-      String document_id;
-      IdXMLFile().load(filename, protein_identifications, identifications, document_id);
-    }
+    FileHandler().loadIdentifications(filename, protein_identifications, identifications, {type});
 
     layer.annotate(identifications, protein_identifications);
     return true;
@@ -221,7 +234,7 @@ namespace OpenMS
   bool LayerAnnotatorAMS::annotateWorker_(LayerDataBase& layer, const String& filename, LogWindow& log) const
   {
     FeatureMap fm;
-    FeatureXMLFile().load(filename, fm);
+    FileHandler().loadFeatures(filename, fm, {FileTypes::FEATUREXML});
 
     // last protein ID must be from AccurateMassSearch (it gets appended there)
     String engine = "no protein identification section found";
@@ -268,7 +281,7 @@ namespace OpenMS
       OSWData data;
       oswf.readMinimal(data);
       // allow data to map from transition.id (=native.id) to a chromatogram index in MSExperiment
-      data.buildNativeIDResolver(*lp->getChromatogramData().get());
+      data.buildNativeIDResolver(lp->getChromatogramData().get()->getMSExperiment());
       lp->setChromatogramAnnotation(std::move(data));
       return true;
     }

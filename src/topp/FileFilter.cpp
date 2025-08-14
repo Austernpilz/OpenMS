@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow $
@@ -45,11 +19,9 @@
 #include <OpenMS/FORMAT/FileHandler.h>
 #include <OpenMS/FORMAT/FileTypes.h>
 #include <OpenMS/FORMAT/MSNumpressCoder.h>
-#include <OpenMS/FORMAT/MzMLFile.h>
 
-#include <OpenMS/FILTERING/NOISEESTIMATION/SignalToNoiseEstimatorMedian.h>
-#include <OpenMS/COMPARISON/SPECTRA/ZhangSimilarityScore.h>
-#include <OpenMS/CONCEPT/Factory.h>
+#include <OpenMS/PROCESSING/NOISEESTIMATION/SignalToNoiseEstimatorMedian.h>
+#include <OpenMS/COMPARISON/ZhangSimilarityScore.h>
 
 #include <OpenMS/APPLICATIONS/TOPPBase.h>
 
@@ -89,6 +61,11 @@ Depending on the input file type, additional specific operations are possible:
     - filter by signal-to-noise estimation
     - filter by scan mode of the spectra
     - filter by scan polarity of the spectra
+    - filter by activation method of the spectra
+    - filter by collision energy of the spectra
+    - filter by isolation window width of the spectra
+    - select/remove zoom scans
+    - remove chromatograms, meta data arrays, and empty spectra
 - remove MS2 scans whose precursor matches identifications (from an idXML file in 'id:blacklist')
 - featureXML
     - filter by feature charge
@@ -123,7 +100,7 @@ If you want to extract an MS1 region with untouched MS2 spectra included, you wi
 @htmlinclude TOPP_FileFilter.html
 
 For the parameters of the S/N algorithm section see the class documentation there: @n
-    @ref OpenMS::SignalToNoiseEstimatorMedian "peak_options:sn"@n
+@ref OpenMS::SignalToNoiseEstimatorMedian "peak_options:sn"@n
 
 */
 
@@ -239,7 +216,7 @@ private:
           }
         }
       }
-      feature.setPeptideIdentifications(vector<PeptideIdentification>(1, temp));
+      feature.setPeptideIdentifications(PeptideIdentificationList(1, temp));
       // not filtering sequences or accessions
       if (sequences.empty() && accessions.empty())
       {
@@ -329,6 +306,7 @@ protected:
     registerFlag_("peak_options:no_chromatograms", "No conversion to space-saving real chromatograms, e.g. from SRM scans");
     registerFlag_("peak_options:remove_chromatograms", "Removes chromatograms stored in a file");
     registerFlag_("peak_options:remove_empty", "Removes spectra and chromatograms without peaks.");
+    registerFlag_("peak_options:remove_metadataarrays", "Remove all binary data (e.g. ion mobility), except m/z and intensity.");
     registerStringOption_("peak_options:mz_precision", "32 or 64", 64, "Store base64 encoded m/z data using 32 or 64 bit precision", false);
     setValidStrings_("peak_options:mz_precision", ListUtils::create<String>("32,64"));
     registerStringOption_("peak_options:int_precision", "32 or 64", 32, "Store base64 encoded intensity data using 32 or 64 bit precision", false);
@@ -674,8 +652,7 @@ protected:
       // loading input
       //-------------------------------------------------------------
 
-      MzMLFile f;
-      f.setLogType(log_type_);
+      FileHandler f;
       f.getOptions().setRTRange(DRange<1>(rt_l, rt_u));
       f.getOptions().setMZRange(DRange<1>(mz_l, mz_u));
       f.getOptions().setIntensityRange(DRange<1>(it_l, it_u));
@@ -708,7 +685,7 @@ protected:
       f.getOptions().setNumpressConfigurationFloatDataArray(npconfig_fda);
 
       MapType exp;
-      f.load(in, exp);
+      f.loadExperiment(in, exp, {FileTypes::MZML}, log_type_);
 
       // remove spectra with meta values:
       if (remove_meta_enabled)
@@ -749,6 +726,16 @@ protected:
           ,chroms.end());
       }
 
+      bool remove_metadataarrays = getFlag_("peak_options:remove_metadataarrays");
+      if (remove_metadataarrays)
+      {
+        for (MapType::SpectrumType& spec : exp.getSpectra())
+        {
+          spec.getFloatDataArrays().clear();
+          spec.getStringDataArrays().clear();
+          spec.getIntegerDataArrays().clear();
+        }
+      }
       //-------------------------------------------------------------
       // calculations
       //-------------------------------------------------------------
@@ -951,8 +938,8 @@ protected:
         bool is_blacklist = getStringOption_("consensus:blackorwhitelist:blacklist") == "true" ? true : false;
         
         ConsensusMap consensus_map;
-        ConsensusXMLFile cxml_file;
-        cxml_file.load(consensus_blackorwhitelist, consensus_map);
+        FileHandler cxml_file;
+        cxml_file.loadConsensusFeatures(consensus_blackorwhitelist, consensus_map);
         consensus_map.sortByMZ();
 
         int ret = filterByBlackOrWhiteList(is_blacklist, exp, consensus_map, rt_tol, mz_tol, is_ppm, maps);
@@ -975,7 +962,7 @@ protected:
         bool is_blacklist = getStringOption_("spectra:blackorwhitelist:blacklist") == "true" ? true : false;
 
         PeakMap lib_file;
-        MzMLFile().load(lib_file_name, lib_file);
+        FileHandler().loadExperiment(lib_file_name, lib_file, {FileTypes::MZML}, log_type_);
 
         int ret = filterByBlackOrWhiteList(is_blacklist, exp, lib_file, tol_rt, tol_mz, tol_sim, is_ppm);
         if (ret != EXECUTION_OK)
@@ -992,7 +979,7 @@ protected:
 
       //annotate output with data processing info
       addDataProcessing_(exp, getProcessingInfo_(DataProcessing::FILTERING));
-      f.store(out, exp);
+      f.storeExperiment(out, exp,{FileTypes::MZML}, log_type_);
     }
     else if (in_type == FileTypes::FEATUREXML || in_type == FileTypes::CONSENSUSXML)
     {
@@ -1005,13 +992,13 @@ protected:
         //-------------------------------------------------------------
 
         FeatureMap feature_map;
-        FeatureXMLFile f;
+        FileHandler f;
         //f.setLogType(log_type_);
         // this does not work yet implicitly - not supported by FeatureXMLFile
-        f.getOptions().setRTRange(DRange<1>(rt_l, rt_u));
-        f.getOptions().setMZRange(DRange<1>(mz_l, mz_u));
-        f.getOptions().setIntensityRange(DRange<1>(it_l, it_u));
-        f.load(in, feature_map);
+        f.getFeatOptions().setRTRange(DRange<1>(rt_l, rt_u));
+        f.getFeatOptions().setMZRange(DRange<1>(mz_l, mz_u));
+        f.getFeatOptions().setIntensityRange(DRange<1>(it_l, it_u));
+        f.loadFeatures(in, feature_map);
 
 
         //-------------------------------------------------------------
@@ -1026,9 +1013,9 @@ protected:
         // only keep charge ch_l:ch_u   (WARNING: feature files without charge information have charge=0, see Ctor of KERNEL/Feature.h)
         for (Feature& fm : feature_map)
         {
-          bool const rt_ok = f.getOptions().getRTRange().encloses(DPosition<1>(fm.getRT()));
-          bool const mz_ok = f.getOptions().getMZRange().encloses(DPosition<1>(fm.getMZ()));
-          bool const int_ok = f.getOptions().getIntensityRange().encloses(DPosition<1>(fm.getIntensity()));
+          bool const rt_ok = f.getFeatOptions().getRTRange().encloses(DPosition<1>(fm.getRT()));
+          bool const mz_ok = f.getFeatOptions().getMZRange().encloses(DPosition<1>(fm.getMZ()));
+          bool const int_ok = f.getFeatOptions().getIntensityRange().encloses(DPosition<1>(fm.getIntensity()));
           bool const charge_ok = ((charge_l <= fm.getCharge()) && (fm.getCharge() <= charge_u));
           bool const size_ok = ((size_l <= fm.getSubordinates().size()) && (fm.getSubordinates().size() <= size_u));
           bool const q_ok = ((q_l <= fm.getOverallQuality()) && (fm.getOverallQuality() <= q_u));
@@ -1065,7 +1052,7 @@ protected:
         //annotate output with data processing info
         addDataProcessing_(map_sm, getProcessingInfo_(DataProcessing::FILTERING));
 
-        f.store(out, map_sm);
+        f.storeFeatures(out, map_sm, {FileTypes::FEATUREXML});
       }
       else if (in_type == FileTypes::CONSENSUSXML)
       {
@@ -1074,12 +1061,12 @@ protected:
         //-------------------------------------------------------------
 
         ConsensusMap consensus_map;
-        ConsensusXMLFile f;
+        FileHandler f;
         //f.setLogType(log_type_);
         f.getOptions().setRTRange(DRange<1>(rt_l, rt_u));
         f.getOptions().setMZRange(DRange<1>(mz_l, mz_u));
         f.getOptions().setIntensityRange(DRange<1>(it_l, it_u));
-        f.load(in, consensus_map);
+        f.loadConsensusFeatures(in, consensus_map);
 
         //-------------------------------------------------------------
         // calculations
@@ -1125,7 +1112,7 @@ protected:
           if (maps.size() == 1) // When extracting a feature map from a consensus map, only one map ID should be specified. Hence 'maps' should contain only one integer.
           {
             FeatureMap feature_map_filtered;
-            FeatureXMLFile ff;
+            FileHandler ff;
 
             for (ConsensusMap::Iterator cm_it = consensus_map_filtered.begin(); cm_it != consensus_map_filtered.end(); ++cm_it)
             {
@@ -1153,7 +1140,7 @@ protected:
 
             feature_map_filtered.applyMemberFunction(&UniqueIdInterface::setUniqueId);
 
-            ff.store(out, feature_map_filtered);
+            ff.storeFeatures(out, feature_map_filtered, {FileTypes::FEATUREXML});
           }
           else
           {
@@ -1211,14 +1198,14 @@ protected:
             //annotate output with data processing info
             addDataProcessing_(consensus_map_filtered, getProcessingInfo_(DataProcessing::FILTERING));
 
-            f.store(out, consensus_map_filtered);
+            f.storeConsensusFeatures(out, consensus_map_filtered, {FileTypes::CONSENSUSXML});
           }
           else
           {
             //annotate output with data processing info
             addDataProcessing_(cm_new, getProcessingInfo_(DataProcessing::FILTERING));
 
-            f.store(out, cm_new);
+            f.storeConsensusFeatures(out, cm_new, {FileTypes::CONSENSUSXML});
           }
         }
       }
@@ -1242,8 +1229,8 @@ protected:
   ExitCodes filterByBlackList(MapType& exp, const String& id_blacklist, bool blacklist_imperfect, double rt_tol, double mz_tol)
   {
     vector<ProteinIdentification> protein_ids;
-    vector<PeptideIdentification> peptide_ids;
-    IdXMLFile().load(id_blacklist, protein_ids, peptide_ids);
+    PeptideIdentificationList peptide_ids;
+    FileHandler().loadIdentifications(id_blacklist, protein_ids, peptide_ids);
 
     // translate idXML entries into something more handy
     typedef std::vector<Peak2D> IdType;
@@ -1409,7 +1396,7 @@ protected:
     const bool enable_rt_check = (rt_tol >= 0);
     const bool enable_sim_check = (sim_tol > -1);
 
-    std::unique_ptr<PeakSpectrumCompareFunctor> comp_function(Factory<PeakSpectrumCompareFunctor>::create("ZhangSimilarityScore"));
+    auto comp_function= std::unique_ptr<PeakSpectrumCompareFunctor>(new (ZhangSimilarityScore));
 
     set<Size> list_idx;
 

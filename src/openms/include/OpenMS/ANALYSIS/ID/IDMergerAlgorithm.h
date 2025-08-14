@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Julianus Pfeuffer $
@@ -39,6 +13,7 @@
 #include <OpenMS/CONCEPT/ProgressLogger.h>
 #include <OpenMS/KERNEL/ConsensusMap.h>
 #include <OpenMS/METADATA/ExperimentalDesign.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 
 #include <unordered_set>
 
@@ -68,9 +43,9 @@ namespace OpenMS
     /// Insert (=move and clear) a run with its peptide IDs into the internal merged data structures,
     /// based on the initial mapping from fileorigins to new run
     void insertRuns(std::vector<ProteinIdentification>&& prots,
-                    std::vector<PeptideIdentification>&& peps);
+                    PeptideIdentificationList&& peps);
     void insertRuns(const std::vector<ProteinIdentification>& prots,
-                    const std::vector<PeptideIdentification>& peps);
+                    const PeptideIdentificationList& peps);
 
     //TODO add methods to just insert prots or just peps. Especially makes sense if you do re-indexing anyway,
     // then you do not need the proteins. But then we need origin information. Either externally in form of a
@@ -81,7 +56,7 @@ namespace OpenMS
 
     /// Return the merged results and reset/clear all internal data
     void returnResultsAndClear(ProteinIdentification& prots,
-                   std::vector<PeptideIdentification>& peps);
+                   PeptideIdentificationList& peps);
 
   private:
 
@@ -121,7 +96,7 @@ namespace OpenMS
     /// then moves the peptide IDs based on the
     /// mapping in
     void updateAndMovePepIDs_(
-        std::vector<PeptideIdentification>&& pepIDs,
+        PeptideIdentificationList&& pepIDs,
         const std::map<String, Size>& runID_to_runIdx,
         const std::vector<StringList>& originFiles,
         bool annotate_origin
@@ -129,7 +104,7 @@ namespace OpenMS
 
 
     void movePepIDsAndRefProteinsToResultFaster_(
-        std::vector<PeptideIdentification>&& pepIDs,
+        PeptideIdentificationList&& pepIDs,
         std::vector<ProteinIdentification>&& old_protRuns
     );
 
@@ -137,7 +112,7 @@ namespace OpenMS
     ProteinIdentification prot_result_;
 
     /// the resulting new Peptide IDs
-    std::vector<PeptideIdentification> pep_result_;
+    PeptideIdentificationList pep_result_;
 
     static size_t accessionHash_(const ProteinHit& p){
       return std::hash<String>()(p.getAccession());

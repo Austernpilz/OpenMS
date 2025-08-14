@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg$
@@ -35,6 +9,7 @@
 
 #include <OpenMS/DATASTRUCTURES/DefaultParamHandler.h>
 #include <OpenMS/METADATA/PeptideIdentification.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 #include <OpenMS/METADATA/ProteinIdentification.h>
 #include <unordered_map>
 
@@ -116,14 +91,14 @@ public:
         /// Protein identifications
         std::vector<ProteinIdentification> prot_idents;
         /// Peptide identifications
-        std::vector<PeptideIdentification> pep_idents;
+        PeptideIdentificationList pep_idents;
         /// Constructs a new RipFileContent object
-        RipFileContent(const std::vector<ProteinIdentification>& prot_idents, const std::vector<PeptideIdentification>& pep_idents)
+        RipFileContent(const std::vector<ProteinIdentification>& prot_idents, const PeptideIdentificationList& pep_idents)
             : prot_idents(prot_idents), pep_idents(pep_idents) {}
         /// Get protein identifications
         const std::vector<ProteinIdentification> & getProteinIdentifications();
         /// Get peptide identifications
-        const std::vector<PeptideIdentification> & getPeptideIdentifications();
+        const PeptideIdentificationList & getPeptideIdentifications();
     };
 
     /// Represents the result of an IDRipper process, a map assigning file content to output file identifiers
@@ -138,8 +113,8 @@ public:
     /**
       @brief Ripping protein/peptide identification according their file origin
 
-      Iteration over all @p PeptideIdentification. For each annotated file origin create a map entry and store the
-      respective @p PeptideIdentification and @p ProteinIdentification.
+      Iteration over all @p peptides. For each annotated file origin create a map entry and store the
+      respective @p peptides and @p proteins.
 
       @param ripped Contains the protein identification and peptide identification for each file origin annotated in proteins and peptides
       @param proteins Protein identification
@@ -150,17 +125,18 @@ public:
     void rip(
             RipFileMap& ripped,
             std::vector<ProteinIdentification>& proteins,
-            std::vector<PeptideIdentification>& peptides,
+            PeptideIdentificationList& peptides,
             bool numeric_filenames,
             bool split_ident_runs);
 
     /**
       @brief Ripping protein/peptide identification according their file origin
 
-      Iteration over all @p PeptideIdentification. For each annotated file origin create a map entry and store the
-      respective @p PeptideIdentification and @p ProteinIdentification.
+      Iteration over all @p peptides. For each annotated file origin create a map entry and store the
+      respective @p peptides and @p proteins.
 
-      @param ripped Contains the protein identification and peptide identification for each file origin annotated in proteins and peptides
+      @param[out] rfis File info relating to @p rfcs
+      @param[out] rfcs Contains the protein identification and peptide identification for each file origin annotated in proteins and peptides
       @param proteins Protein identification
       @param peptides Peptide identification annotated with file origin
       @param numeric_filenames If false, deduce output files using basenames of origin annotations. Throws an exception if they are not unique. If true, assemble output files based on numerical IDs only.
@@ -168,10 +144,10 @@ public:
     */
     // Autowrap compatible wrapper for rip(RipFileMap,...)
     void rip(
-            std::vector<RipFileIdentifier> & rfis,
-            std::vector<RipFileContent> & rfcs,
+            std::vector<RipFileIdentifier>& rfis,
+            std::vector<RipFileContent>& rfcs,
             std::vector<ProteinIdentification>& proteins,
-            std::vector<PeptideIdentification>& peptides,
+            PeptideIdentificationList& peptides,
             bool numeric_filenames,
             bool split_ident_runs);
 
@@ -185,7 +161,7 @@ private:
     IDRipper & operator=(const IDRipper & rhs);
 
     /// helper function, detects file origin annotation standard from collections of protein and peptide hits
-    OriginAnnotationFormat detectOriginAnnotationFormat_(std::map<String, UInt> & file_origin_map, const std::vector<PeptideIdentification> & peptide_idents);
+    OriginAnnotationFormat detectOriginAnnotationFormat_(std::map<String, UInt> & file_origin_map, const PeptideIdentificationList & peptide_idents);
     /// helper function, extracts all protein hits that match the protein accession
     void getProteinHits_(std::vector<ProteinHit> & result, const std::unordered_map<String, const ProteinHit*> & acc2protein_hits, const std::set<String> & protein_accessions);
     /// helper function, returns the string representation of the peptide hit accession

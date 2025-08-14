@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow $
@@ -33,8 +7,9 @@
 // --------------------------------------------------------------------------
 
 #include <OpenMS/ANALYSIS/ID/IDMapper.h>
-#include <OpenMS/MATH/MISC/MathFunctions.h>
+#include <OpenMS/MATH/MathFunctions.h>
 #include <OpenMS/METADATA/SpectrumLookup.h>
+#include <OpenMS/METADATA/AnnotatedMSRun.h>
 #include <OpenMS/CONCEPT/Constants.h>
 #include <OpenMS/SYSTEM/File.h>
 
@@ -100,18 +75,19 @@ namespace OpenMS
     ignore_charge_ = param_.getValue("ignore_charge") == "true";
   }
 
-  void IDMapper::annotate(PeakMap& map, const vector<PeptideIdentification>& peptide_ids, const vector<ProteinIdentification>& protein_ids, const bool clear_ids, const bool map_ms1)
+  void IDMapper::annotate(AnnotatedMSRun& map,
+    const PeptideIdentificationList& peptide_ids,
+    const vector<ProteinIdentification>& protein_ids,
+    const bool clear_ids,
+    const bool map_ms1)
   {
     checkHits_(peptide_ids);
     SpectrumLookup lookup;
 
     if (clear_ids)
     { // start with empty IDs
-      for (PeakMap::iterator it = map.begin(); it != map.end(); ++it)
-      {
-        it->setPeptideIdentifications({});
-      }
-      map.setProteinIdentifications({});
+      map.getPeptideIdentifications().clear();
+      map.getProteinIdentifications().clear();
     }
 
     if (peptide_ids.empty()) return;
@@ -119,33 +95,41 @@ namespace OpenMS
     // append protein identifications
     map.getProteinIdentifications().insert(map.getProteinIdentifications().end(), protein_ids.begin(), protein_ids.end());
 
-    lookup.readSpectra(map);
+    // AnnotatedMSRun will have one PeptideIdentification per spectrum (including ones without hits)
+    map.getPeptideIdentifications().resize(map.getMSExperiment().getSpectra().size());
+    
+    // set up the lookup table for the spectra
+    lookup.readSpectra(map.getMSExperiment());
 
     // remember which peptides were mapped (for stats later)
     unordered_set<Size> peptides_mapped;
+
     // store mapping of identification RT to index (ignore empty hits)
     multimap<double, Size> identifications_precursors;
     for (Size i = 0; i < peptide_ids.size(); ++i)
     {
-      if (!peptide_ids[i].empty())
-      { // mapping is done by either native id or by comparing peptide_id RT with experiment RT
-        if (!peptide_ids[i].metaValueExists(Constants::UserParam::SPECTRUM_REFERENCE)) 
-        { // use RT for mapping 
+      if (peptide_ids[i].empty()) continue;      
+      // mapping is done by either native id or by comparing peptide_id RT with experiment RT
+      if (!peptide_ids[i].metaValueExists(Constants::UserParam::SPECTRUM_REFERENCE)) 
+      { // use RT for mapping 
+        identifications_precursors.insert(make_pair(peptide_ids[i].getRT(), i));
+      } 
+      else 
+      { // use native id for mapping
+        DataValue native_id = peptide_ids[i].getMetaValue(Constants::UserParam::SPECTRUM_REFERENCE);
+        try
+        { // spectrum can be retrieved
+          Size spectrum_idx = lookup.findByNativeID(native_id);
+          // Since we now have only one PeptideIdentification per spectrum, we need to merge the hits
+          PeptideIdentification& existing_id = map.getPeptideIdentifications()[spectrum_idx];
+          existing_id.getHits().insert(existing_id.getHits().end(),
+                                      peptide_ids[i].getHits().begin(),
+                                      peptide_ids[i].getHits().end());
+          peptides_mapped.insert(i);
+        }
+        catch (const Exception::ElementNotFound& /*e*/)
+        { // use RT for mapping
           identifications_precursors.insert(make_pair(peptide_ids[i].getRT(), i));
-        } 
-        else 
-        { // use native id for mapping
-          DataValue native_id = peptide_ids[i].getMetaValue(Constants::UserParam::SPECTRUM_REFERENCE);
-          try 
-          { // spectrum can be retrieved
-            Size spectrum_idx = lookup.findByNativeID(native_id);
-            map[spectrum_idx].getPeptideIdentifications().push_back(peptide_ids[i]);
-            peptides_mapped.insert(i);
-          } 
-          catch (const Exception::ElementNotFound& /*e*/) 
-          { // use RT for mapping
-            identifications_precursors.insert(make_pair(peptide_ids[i].getRT(), i));
-          }
         }
       }
     }
@@ -154,9 +138,9 @@ namespace OpenMS
     {
       // store mapping of scan RT to index
       multimap<double, Size> experiment_precursors;
-      for (Size i = 0; i < map.size(); i++)
+      for (Size i = 0; i < map.getMSExperiment().size(); i++)
       {
-        experiment_precursors.insert(make_pair(map[i].getRT(), i));
+        experiment_precursors.insert(make_pair(map.getMSExperiment()[i].getRT(), i));
       }
 
       // note that mappings are sorted by key via multimap (we rely on that down below)
@@ -200,7 +184,7 @@ namespace OpenMS
           bool success = map_ms1;
           if (!success)
           {
-            for (const auto& precursor : map[experiment_iterator->second].getPrecursors())
+            for (const auto& precursor : map.getMSExperiment()[experiment_iterator->second].getPrecursors())
             {
               if (isMatch_(0, peptide_ids[identifications_iterator->second].getMZ(), precursor.getMZ()))
               {
@@ -209,9 +193,14 @@ namespace OpenMS
               }
             }
           }
+
           if (success)
           {
-            map[experiment_iterator->second].getPeptideIdentifications().push_back(peptide_ids[identifications_iterator->second]);
+            // Since we have only one PeptideIdentification per spectrum, we need to merge the hits
+            PeptideIdentification& existing_id = map.getPeptideIdentifications()[experiment_iterator->second];
+            existing_id.getHits().insert(existing_id.getHits().end(),
+                                        peptide_ids[identifications_iterator->second].getHits().begin(),
+                                        peptide_ids[identifications_iterator->second].getHits().end());
             peptides_mapped.insert(identifications_iterator->second);
           }
           ++identifications_iterator;
@@ -227,16 +216,15 @@ namespace OpenMS
              << "       Unmapped (empty) peptides: " << peptide_ids.size() - identifications_precursors.size() << endl;
   }
 
-
-  void IDMapper::annotate(PeakMap& map, FeatureMap fmap, const bool clear_ids, const bool map_ms1)
+  void IDMapper::annotate(AnnotatedMSRun& map, const FeatureMap& fmap, const bool clear_ids, const bool map_ms1)
   {
     const vector<ProteinIdentification>& protein_ids = fmap.getProteinIdentifications();
-    vector<PeptideIdentification> peptide_ids;
+    PeptideIdentificationList peptide_ids;
 
     for (FeatureMap::const_iterator it = fmap.begin(); it != fmap.end(); ++it)
     {
-      const vector<PeptideIdentification>& pi = it->getPeptideIdentifications();
-      for (vector<PeptideIdentification>::const_iterator itp = pi.begin(); itp != pi.end(); ++itp)
+      const PeptideIdentificationList& pi = it->getPeptideIdentifications();
+      for (PeptideIdentificationList::const_iterator itp = pi.begin(); itp != pi.end(); ++itp)
       {
         peptide_ids.push_back(*itp);
         // if pepID has no m/z or RT, use the values of the feature
@@ -272,7 +260,7 @@ namespace OpenMS
 
   void IDMapper::annotate(
     ConsensusMap& map,
-    const vector<PeptideIdentification>& ids,
+    const PeptideIdentificationList& ids,
     const vector<ProteinIdentification>& protein_ids,
     bool measure_from_subelements,
     bool annotate_ids_with_subelements,
@@ -314,6 +302,7 @@ namespace OpenMS
     // We can directly map by native id
     if ((native_id_type != NATIVE_ID_TYPE::UNKNOWN) )
     {
+      bool lookForScanNrsAsIntegers = false;
       ProteinIdentification::Mapping mspath_mapping{protein_ids}; // used to retrieve spectrum file information annotated in protein ids given a peptide identification
 
       for (Size i = 0; i < ids.size(); ++i)
@@ -323,9 +312,23 @@ namespace OpenMS
         if (pid->getHits().empty()) continue; // skip IDs without peptide annotations
 
         String spectrum_file = File::basename(mspath_mapping.getPrimaryMSRunPath(*pid));
-        String spectrum_reference = pid->getMetaValue(Constants::UserParam::SPECTRUM_REFERENCE);
-        // missing file origin is fine but we need a spectrum_reference if we want to build the map
+        String spectrum_reference = pid->getMetaValue(Constants::UserParam::SPECTRUM_REFERENCE, "");
+        // missing file origin is fine, but we need a spectrum_reference if we want to build the map
         if (spectrum_reference.empty()) continue;
+        // TODO make a unique decision in the whole class on if to extract by scan number or full string?
+        if (!lookForScanNrsAsIntegers)
+        {
+          // check if spectrum reference is a string that just contains a number
+          try
+          {
+            ids[0].getSpectrumReference().toInt64();
+            lookForScanNrsAsIntegers = true;
+          }
+          catch (...)
+          {
+            lookForScanNrsAsIntegers = false;
+          }  
+        }
     
         // TODO: check if there is already an entry
         file2nativeid2pepid[spectrum_file][spectrum_reference] = pid;
@@ -352,16 +355,32 @@ namespace OpenMS
         const auto first_channel = *cf.getFeatures().begin();                  
         String filename = File::basename(map.getColumnHeaders()[first_channel.getMapIndex()].filename); // all channels are associated with same file in TMT/iTRAQ
 
+        boost::regex scanregex{""};
         String cf_scan_id_key_name = (native_id_type == NATIVE_ID_TYPE::MS2IDMS3TMT) ? "id_scan_id" : "scan_id";
         String cf_scan_id = cf.getMetaValue(cf_scan_id_key_name, "");
         if (!cf_scan_id.empty()) 
         {
+          // This assumes all scan_ids are of the same structure
+          if (lookForScanNrsAsIntegers && scanregex.empty())
+          {
+            scanregex = SpectrumLookup::getRegExFromNativeID(cf_scan_id);
+          }
           if (auto run_it = file2nativeid2pepid.find(filename); run_it != file2nativeid2pepid.end()) // TMT/iTRAQ run has identifications
           {
             if (auto scanid_it = run_it->second.find(cf_scan_id); scanid_it != run_it->second.end()) // TMT/iTRAQ run has scan_id with identification
             {
               cf.getPeptideIdentifications().push_back(*scanid_it->second);
               ++id_matches_single; // in TMT we only match to single consensus feature
+            }
+            // look for only the scan_number in case the search engine only extracted this (e.g. Sage)
+            else if (lookForScanNrsAsIntegers)
+            {
+              auto scanid_it = run_it->second.find(SpectrumLookup::extractScanNumber(cf_scan_id, scanregex, false));
+              if(scanid_it != run_it->second.end())
+              {
+                cf.getPeptideIdentifications().push_back(*scanid_it->second);
+                ++id_matches_single; // in TMT we only match to single consensus feature
+              }
             }
           } // else identification file does not contained scan id (e.g. was removed)  
           else
@@ -634,7 +653,7 @@ namespace OpenMS
   }
 
   void IDMapper::annotate(FeatureMap& map, 
-    const vector<PeptideIdentification>& ids, 
+    const PeptideIdentificationList& ids, 
     const vector<ProteinIdentification>& protein_ids,
     bool use_centroid_rt, 
     bool use_centroid_mz, 
@@ -832,7 +851,6 @@ namespace OpenMS
 
     // map all unidentified precursor to features
     Size spectrum_matches_none(0);
-    Size spectrum_matches(0);
     Size spectrum_matches_single(0);
     Size spectrum_matches_multi(0);
 
@@ -914,7 +932,6 @@ namespace OpenMS
               // only one m/z value to check, which was already incorporated
               // into the overall bounding box -> success!
               feat.getPeptideIdentifications().push_back(precursor_empty_id);
-              ++spectrum_matches;
               break; // "mz_it" loop
             }
             // else: check all the mass traces
@@ -996,7 +1013,7 @@ namespace OpenMS
     throw Exception::InvalidValue(__FILE__, __LINE__, OPENMS_PRETTY_FUNCTION, "IDMapper::getAbsoluteTolerance_(): illegal internal state of measure_!", String(measure_));
   }
 
-  void IDMapper::checkHits_(const vector<PeptideIdentification>& ids) const
+  void IDMapper::checkHits_(const PeptideIdentificationList& ids) const
   {
     for (Size i = 0; i < ids.size(); ++i)
     {
@@ -1082,3 +1099,4 @@ namespace OpenMS
   }
 
 } // namespace OpenMS
+

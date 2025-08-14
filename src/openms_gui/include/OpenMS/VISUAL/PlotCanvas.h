@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -383,7 +357,12 @@ namespace OpenMS
     }
 
     /**
-        @brief Sets the filters applied to the data before drawing (for the current layer)
+      @brief Sets filters, but does not repaint (useful when setting up a new layer)
+    */
+    virtual void initFilters(const DataFilters& filters);
+
+    /**
+        @brief Sets the filters applied to the data; and redraws
     */
     virtual void setFilters(const DataFilters& filters);
 
@@ -423,11 +402,16 @@ namespace OpenMS
       @param map Shared pointer to input map. It can be performed in constant time and does not double the required memory.
       @param od_map Shared pointer to on disk data which potentially caches some data to save memory (the map can be empty, but do not pass nullptr).
       @param filename This @em absolute filename is used to monitor changes in the file and reload the data
+      @param caption The caption of the layer (shown in the layer window)
       @param use_noise_cutoff Add a noise filter which removes low-intensity peaks
 
       @return If a new layer was created
     */
-    bool addPeakLayer(const ExperimentSharedPtrType& map, ODExperimentSharedPtrType od_map, const String& filename = "", const bool use_noise_cutoff = false);
+    bool addPeakLayer(const ExperimentSharedPtrType& map,
+                      ODExperimentSharedPtrType od_map,
+                      const String& filename = "",
+                      const String& caption = "",
+                      const bool use_noise_cutoff = false);
 
     /**
       @brief Add a chrom data layer
@@ -435,10 +419,11 @@ namespace OpenMS
       @param map Shared pointer to input map. It can be performed in constant time and does not double the required memory.
       @param od_map Shared pointer to on disk data which potentially caches some data to save memory (the map can be empty, but do not pass nullptr).
       @param filename This @em absolute filename is used to monitor changes in the file and reload the data
+      @param caption The caption of the layer (shown in the layer window)
 
       @return If a new layer was created
     */
-    bool addChromLayer(const ExperimentSharedPtrType& map, ODExperimentSharedPtrType od_map, const String& filename = "");
+    bool addChromLayer(const ExperimentSharedPtrType& map, ODExperimentSharedPtrType od_map, const String& filename = "", const String& caption = "");
 
 
     /**
@@ -446,32 +431,36 @@ namespace OpenMS
 
         @param map Shared Pointer to input map. It can be performed in constant time and does not double the required memory.
         @param filename This @em absolute filename is used to monitor changes in the file and reload the data
+        @param caption The caption of the layer (shown in the layer window)
 
         @return If a new layer was created
     */
-    bool addLayer(FeatureMapSharedPtrType map, const String& filename = "");
+    bool addLayer(FeatureMapSharedPtrType map, const String& filename = "", const String& caption = "");
 
     /**
         @brief Add a consensus feature data layer
 
         @param map Shared Pointer to input map. It can be performed in constant time and does not double the required memory.
         @param filename This @em absolute filename is used to monitor changes in the file and reload the data
+        @param caption The caption of the layer (shown in the layer window)
 
         @return If a new layer was created
     */
-    bool addLayer(ConsensusMapSharedPtrType map, const String& filename = "");
+    bool addLayer(ConsensusMapSharedPtrType map, const String& filename = "", const String& caption = "");
     //@}
 
     /**
         @brief Add an identification data layer
 
-        @param peptides Input list of peptides, which has to be mutable and will be empty after adding. Swapping is used to insert the data. It can be performed in constant time and does not double
-       the required memory.
+        @param peptides Input list of peptides, which has to be mutable and will be empty after adding. 
+               Swapping is used to insert the data. It can be performed in constant time and does not double
+               the required memory.
         @param filename This @em absolute filename is used to monitor changes in the file and reload the data
+        @param caption The caption of the layer (shown in the layer window)
 
         @return If a new layer was created
     */
-    bool addLayer(std::vector<PeptideIdentification>& peptides, const String& filename = "");
+    bool addLayer(PeptideIdentificationList& peptides, const String& filename = "", const String& caption = "");
 
     /// Returns the minimum intensity of the active layer
     inline float getCurrentMinIntensity() const
@@ -515,7 +504,7 @@ namespace OpenMS
 
         @see overall_data_range_
     */
-    const RangeType& getDataRange() const;
+    virtual const RangeType& getDataRange() const;
 
     /**
         @brief Returns the first intensity scaling factor for 'snap to maximum intensity mode' (for the currently visible data range).
@@ -734,7 +723,7 @@ protected:
     void keyReleaseEvent(QKeyEvent * e) override;
     void focusOutEvent(QFocusEvent * e) override;
     void leaveEvent(QEvent * e) override;
-    void enterEvent(QEvent * e) override;
+    void enterEvent(QEnterEvent * e) override;
     //@}
 
     /// This method is called whenever the intensity mode changes. Reimplement if you need to react on such changes.

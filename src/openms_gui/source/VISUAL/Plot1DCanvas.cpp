@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg$
@@ -47,9 +21,9 @@
 #include <OpenMS/FORMAT/FileHandler.h>
 #include <OpenMS/CONCEPT/RAIICleanup.h>
 #include <OpenMS/CONCEPT/LogStream.h>
-#include <OpenMS/COMPARISON/SPECTRA/SpectrumAlignmentScore.h>
-#include <OpenMS/COMPARISON/SPECTRA/SpectrumAlignment.h>
-#include <OpenMS/MATH/MISC/MathFunctions.h>
+#include <OpenMS/COMPARISON/SpectrumAlignmentScore.h>
+#include <OpenMS/COMPARISON/SpectrumAlignment.h>
+#include <OpenMS/MATH/MathFunctions.h>
 
 #include <OpenMS/VISUAL/LayerData1DPeak.h>
 #include <OpenMS/VISUAL/LayerData1DChrom.h>
@@ -63,6 +37,7 @@
 #include <QtWidgets/QMessageBox>
 #include <utility>
 
+#include <boost/make_shared.hpp>
 
 using namespace std;
 
@@ -75,12 +50,13 @@ namespace OpenMS
   Plot1DCanvas::ExperimentSharedPtrType prepareChromatogram(Size index, const Plot1DCanvas::ExperimentSharedPtrType& exp_sptr, const Plot1DCanvas::ODExperimentSharedPtrType& ondisc_sptr)
   {
     // create a managed pointer fill it with a spectrum containing the chromatographic data
-    LayerDataBase::ExperimentSharedPtrType chrom_exp_sptr(new LayerDataBase::ExperimentType());
-    chrom_exp_sptr->setMetaValue("is_chromatogram", "true"); //this is a hack to store that we have chromatogram data
+    auto chrom_exp_sptr = boost::make_shared<AnnotatedMSRun>();
+
+    chrom_exp_sptr->getMSExperiment().setMetaValue("is_chromatogram", "true"); //this is a hack to store that we have chromatogram data
     LayerDataBase::ExperimentType::SpectrumType spectrum;
 
     // retrieve chromatogram (either from in-memory or on-disc representation)
-    MSChromatogram current_chrom = exp_sptr->getChromatograms()[index];
+    MSChromatogram current_chrom = exp_sptr->getMSExperiment().getChromatograms()[index];
     if (current_chrom.empty())
     {
       current_chrom = ondisc_sptr->getChromatogram(index);
@@ -102,12 +78,12 @@ namespace OpenMS
     {
       spectrum.emplace_back(-1, 0);
     }
-    chrom_exp_sptr->addSpectrum(spectrum);
+    chrom_exp_sptr->getMSExperiment().addSpectrum(std::move(spectrum));
 
     // store peptide_sequence if available
     if (current_chrom.getPrecursor().metaValueExists("peptide_sequence"))
     {
-      chrom_exp_sptr->setMetaValue("peptide_sequence", current_chrom.getPrecursor().getMetaValue("peptide_sequence"));
+      chrom_exp_sptr->getMSExperiment().setMetaValue("peptide_sequence", current_chrom.getPrecursor().getMetaValue("peptide_sequence"));
     }
 
     return chrom_exp_sptr;
@@ -213,29 +189,23 @@ namespace OpenMS
     emit layerActivated(this);
   }
 
-  void Plot1DCanvas::changeVisibleAreaCommon_(const UnitRange& new_area, bool repaint, bool add_to_stack)
+  void Plot1DCanvas::changeVisibleArea1D_(const UnitRange& new_area, bool repaint, bool add_to_stack)
   {
     auto corrected = correctGravityAxisOfVisibleArea_(new_area);
-    
-    if (intensity_mode_ != IM_PERCENTAGE) // not for Percentage mode, which is always [0,100]
-    { // make sure we stay inside the overall data range of the currently displayable 1D data
-      corrected.pushInto(overall_data_range_1d_);
-    }
-    
     PlotCanvas::changeVisibleArea_(visible_area_.cloneWith(corrected), repaint, add_to_stack);
   }
 
   void Plot1DCanvas::changeVisibleArea_(const AreaXYType& new_area, bool repaint, bool add_to_stack)
   {
-    changeVisibleAreaCommon_(visible_area_.cloneWith(new_area).getAreaUnit(), repaint, add_to_stack);
+    changeVisibleArea1D_(visible_area_.cloneWith(new_area).getAreaUnit(), repaint, add_to_stack);
   }
   void Plot1DCanvas::changeVisibleArea_(const UnitRange& new_area, bool repaint, bool add_to_stack)
   {
-    changeVisibleAreaCommon_(new_area, repaint, add_to_stack);
+    changeVisibleArea1D_(new_area, repaint, add_to_stack);
   }
   void Plot1DCanvas::changeVisibleArea_(VisibleArea new_area, bool repaint, bool add_to_stack)
   {
-    changeVisibleAreaCommon_(new_area.getAreaUnit(), repaint, add_to_stack);
+    changeVisibleArea1D_(new_area.getAreaUnit(), repaint, add_to_stack);
   }
 
   void Plot1DCanvas::dataToWidget(const DPosition<2>& xy_point, QPoint& point, bool flipped)
@@ -759,6 +729,7 @@ namespace OpenMS
     {
       Painter1DBase::drawCross(begin, &painter, 8);
     }
+
     // draw elongation as dashed line (while in measure mode and for all existing distance annotations)
     if (draw_elongation)
     {
@@ -1080,7 +1051,7 @@ namespace OpenMS
       auto* peak_layer = dynamic_cast<LayerData1DPeak*>(&getCurrentLayer());
       if (peak_layer)
         {
-        if (peak_layer->getPeakData()->containsScanOfLevel(1))
+        if (peak_layer->getPeakData()->getMSExperiment().containsScanOfLevel(1))
         {
           context_menu->addAction("Switch to 2D view", [&]() {
             emit showCurrentPeaksAs2D();
@@ -1101,7 +1072,7 @@ namespace OpenMS
         {
           auto l = dynamic_cast<const LayerData1DPeak*>(&getCurrentLayer());
           context_menu->addAction("Switch to DIA-MS view", [&]() {
-            emit showCurrentPeaksAsDIA(l->getCurrentSpectrum().getPrecursors()[0], *l->getPeakData().get());
+            emit showCurrentPeaksAsDIA(l->getCurrentSpectrum().getPrecursors()[0], l->getPeakData()->getMSExperiment());
           });
         }
       }

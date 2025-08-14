@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Hannes Roest $
@@ -38,6 +12,8 @@
 #include <OpenMS/OPENSWATHALGO/DATAACCESS/DataStructures.h>
 #include <OpenMS/FORMAT/DATAACCESS/MSDataChainingConsumer.h>
 #include <OpenMS/FORMAT/DATAACCESS/SwathFileConsumer.h>
+#include <OpenMS/FORMAT/FileHandler.h>
+//TODO remove MzML after we get transform support for our handlers
 #include <OpenMS/FORMAT/MzMLFile.h>
 #include <OpenMS/FORMAT/MzXMLFile.h>
 #include <OpenMS/FORMAT/HANDLERS/MzMLSqliteHandler.h>
@@ -89,7 +65,7 @@ namespace OpenMS
 
       if (readoptions == "normal")
       {
-        MzMLFile().load(file_list[i], *exp.get());
+        FileHandler().loadExperiment(file_list[i], *exp.get(), {FileTypes::MZML});
         spectra_ptr = SimpleOpenMSSpectraFactory::getSpectrumAccessOpenMSPtr(exp);
       }
       else if (readoptions == "cache")
@@ -222,10 +198,10 @@ namespace OpenMS
 
     startProgress(0, 1, "Loading metadata file " + file);
     boost::shared_ptr<PeakMap > experiment_metadata(new PeakMap);
-    MzXMLFile f;
+    FileHandler f;
     f.getOptions().setAlwaysAppendData(true);
     f.getOptions().setFillData(false);
-    f.load(file, *experiment_metadata);
+    f.loadExperiment(file, *experiment_metadata, {FileTypes::MZXML});
     exp_meta = experiment_metadata;
 
     // First pass through the file -> get the meta data
@@ -316,7 +292,7 @@ namespace OpenMS
     } // ensure that filestream gets closed
 
     boost::shared_ptr<PeakMap > exp(new PeakMap);
-    MzMLFile().load(meta_file, *exp.get());
+    FileHandler().loadExperiment(meta_file, *exp.get(), {FileTypes::MZML});
     return SimpleOpenMSSpectraFactory::getSpectrumAccessOpenMSPtr(exp);
   }
 
@@ -324,16 +300,17 @@ namespace OpenMS
   boost::shared_ptr< PeakMap > SwathFile::populateMetaData_(const String& file)
   {
     boost::shared_ptr<PeakMap > experiment_metadata(new PeakMap);
-    MzMLFile f;
+    FileHandler f;
     f.getOptions().setAlwaysAppendData(true);
     f.getOptions().setFillData(false);
-    f.load(file, *experiment_metadata);
+    f.loadExperiment(file, *experiment_metadata);
     return experiment_metadata;
   }
   /// Counts the number of scans in a full Swath file (e.g. concatenated non-split file)
   void SwathFile::countScansInSwath_(const std::vector<MSSpectrum>& exp,
                                      std::vector<int>& swath_counter, int& nr_ms1_spectra,
-                                     std::vector<OpenSwath::SwathMap>& known_window_boundaries)
+                                     std::vector<OpenSwath::SwathMap>& known_window_boundaries,
+                                     double TOLERANCE)
   {
     int ms1_counter = 0;
     for (Size i = 0; i < exp.size(); i++)
@@ -352,28 +329,32 @@ namespace OpenMS
               "Found SWATH scan (MS level 2 scan) without a precursor. Cannot determine SWATH window.");
           }
           const std::vector<Precursor> prec = s.getPrecursors();
-          double center = prec[0].getMZ();
 
-
-          // check if ion mobility is present
-          double lowerIm = -1;
-          double upperIm = -1; // these initial values assume ion mobility is not present
-
+          // set ion mobility if exists, otherwise will take default value of -1
+          double imLower, imUpper;
           if (s.metaValueExists("ion mobility lower limit"))
           {
-            lowerIm = s.getMetaValue("ion mobility lower limit"); // want this to be -1  if no ion mobility
-            upperIm = s.getMetaValue("ion mobility upper limit");
+            imLower = s.getMetaValue("ion mobility lower limit"); // want this to be -1 if no ion mobility
+            imUpper = s.getMetaValue("ion mobility upper limit");
 
           }
+          else
+          {
+            imLower = -1;
+            imUpper = -1;
+          }
 
+          const OpenSwath::SwathMap boundary(prec[0].getMZ() - prec[0].getIsolationWindowLowerOffset(), 
+                                          prec[0].getMZ() + prec[0].getIsolationWindowUpperOffset(), 
+                                          prec[0].getMZ(),
+                                          imLower,
+                                          imUpper,
+                                          false);
           bool found = false;
-
           for (Size j = 0; j < known_window_boundaries.size(); j++)
           {
-            // We group by the precursor mz (center of the window) since this
-            // should be present
-            // for ion mobility, since the center value is not present in the raw data (it is computed) we use the imLower and upper bounds
-            if ((std::fabs(center - known_window_boundaries[j].center) < 1e-6) && (std::fabs(lowerIm - known_window_boundaries[j].imLower) < 1e-6) && (std::fabs(upperIm - known_window_boundaries[j].imUpper < 1e-6)))
+            // Check if the current scan is within the known window boundaries
+            if (known_window_boundaries[j].isEqual(boundary, TOLERANCE))
             {
               found = true;
               swath_counter[j]++;
@@ -383,23 +364,11 @@ namespace OpenMS
           {
             // we found a new SWATH scan
             swath_counter.push_back(1);
-            double lower = prec[0].getMZ() - prec[0].getIsolationWindowLowerOffset();
-            double upper = prec[0].getMZ() + prec[0].getIsolationWindowUpperOffset();
-
-            OpenSwath::SwathMap boundary;
-            boundary.lower = lower;
-            boundary.upper = upper;
-            boundary.center = center;
-
-            // set IM boundaries (if present)
-            boundary.imLower = lowerIm;
-            boundary.imUpper = upperIm;
-
             known_window_boundaries.push_back(boundary);
 
-            OPENMS_LOG_DEBUG << "Adding Swath centered at " << center
-              << " m/z with an isolation window of " << lower << " to " << upper
-              << " m/z and start of " << lowerIm << " and IM end of " << upperIm << std::endl;
+            OPENMS_LOG_DEBUG << "Adding Swath centered at " << boundary.center
+              << " m/z with an isolation window of " << boundary.lower << " to " << boundary.upper
+              << " m/z and IM start of " << boundary.imLower << " and IM end of " << boundary.imUpper << std::endl;
           }
         }
       }

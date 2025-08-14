@@ -5,6 +5,7 @@ from DefaultParamHandler cimport *
 from ProgressLogger cimport *
 from ProteinIdentification cimport *
 from ProteinIdentification cimport *
+from PeptideIdentificationList cimport *
 from PeptideHit cimport *
 
 cdef extern from "<OpenMS/ANALYSIS/ID/BasicProteinInferenceAlgorithm.h>" namespace "OpenMS":
@@ -57,12 +58,12 @@ cdef extern from "<OpenMS/ANALYSIS/ID/BasicProteinInferenceAlgorithm.h>" namespa
         #    print(hits[3].getMetaValue("nr_found_peptides")) # 2
         #  
 
-        BasicProteinInferenceAlgorithm() nogil except +
+        BasicProteinInferenceAlgorithm() except + nogil 
 
-        BasicProteinInferenceAlgorithm(BasicProteinInferenceAlgorithm) nogil except + #wrap-ignore
+        BasicProteinInferenceAlgorithm(BasicProteinInferenceAlgorithm) except + nogil  #wrap-ignore
 
-        void run(libcpp_vector[ PeptideIdentification ] & pep_ids,
-                 libcpp_vector[ ProteinIdentification ] & prot_ids) nogil except +
+        void run(PeptideIdentificationList & pep_ids,
+                 libcpp_vector[ ProteinIdentification ] & prot_ids) except + nogil 
           # wrap-doc:
           #  Performs basic aggregation-based inference per ProteinIdentification run. See class help.
           #  
@@ -71,8 +72,8 @@ cdef extern from "<OpenMS/ANALYSIS/ID/BasicProteinInferenceAlgorithm.h>" namespa
           #  :param prot_ids: Vector of protein identification runs. Scores will be overwritten and groups added.
           #  :return: Writes its results into prot_ids
 
-        void run(libcpp_vector[ PeptideIdentification ] & pep_ids,
-                                ProteinIdentification & prot_id) nogil except +
+        void run(PeptideIdentificationList & pep_ids,
+                                ProteinIdentification & prot_id) except + nogil 
           # wrap-doc:
           #  Performs basic aggregation-based inference on single ProteinIdentification run. See class help.
           #  
@@ -83,7 +84,7 @@ cdef extern from "<OpenMS/ANALYSIS/ID/BasicProteinInferenceAlgorithm.h>" namespa
 
         void run(ConsensusMap & cmap,
                     ProteinIdentification & prot_id,
-                    bool include_unassigned) nogil except +
+                    bool include_unassigned) except + nogil 
           # wrap-doc:
           #  Performs basic aggregation-based inference on identifications in a ConsensusMap. See class help.\n
           #  `prot_id` should contain the union of all proteins in the map. E.g. use ConsensusMapMergerAlgorithm and
@@ -98,6 +99,7 @@ cdef extern from "<OpenMS/ANALYSIS/ID/BasicProteinInferenceAlgorithm.h>" namespa
     cdef enum AggregationMethod "OpenMS::BasicProteinInferenceAlgorithm::AggregationMethod":
         # wrap-doc:
         #    Aggregation method
+
         # wrap-attach:
         #    BasicProteinInferenceAlgorithm
         PROD # wrap-doc:Aggregate by product (ignore zeroes)

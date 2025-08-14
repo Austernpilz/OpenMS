@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry               
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-// 
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution 
-//    may be used to endorse or promote products derived from this software 
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS. 
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING 
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; 
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR 
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 // 
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg$
@@ -37,7 +11,7 @@
 
 // /////////////////////////
 
-#include <OpenMS/MATH/MISC/MathFunctions.h>
+#include <OpenMS/MATH/MathFunctions.h>
 #include <iostream>
 #include <vector>
 
@@ -139,10 +113,10 @@ START_SECTION((log2linear))
 END_SECTION
 
 START_SECTION((isOdd))
-	TEST_EQUAL(isOdd(0),false)
-	TEST_EQUAL(isOdd(1),true)
-	TEST_EQUAL(isOdd(2),false)
-	TEST_EQUAL(isOdd(3),true)
+	TEST_TRUE(!isOdd(0))
+	TEST_TRUE(isOdd(1))
+	TEST_TRUE(!isOdd(2))
+	TEST_TRUE(isOdd(3))
 END_SECTION
 
 START_SECTION((template <typename T> T round (T x)))
@@ -150,18 +124,40 @@ START_SECTION((template <typename T> T round (T x)))
 	float f_up = 14.50f;		 // expected 15
 	double d_up = -999.49;   // expected -999
 	double d_down = -675.77; // expected -676
-	TEST_REAL_SIMILAR(round(f_down), 14.0)
-	TEST_REAL_SIMILAR(round(f_up), 15.0)
-	TEST_REAL_SIMILAR(round(d_up), -999)
-	TEST_REAL_SIMILAR(round(d_down), -676)
+	TEST_REAL_SIMILAR(Math::round(f_down), 14.0)
+  TEST_REAL_SIMILAR(Math::round(f_up), 15.0)
+  TEST_REAL_SIMILAR(Math::round(d_up), -999)
+	TEST_REAL_SIMILAR(Math::round(d_down), -676)
 END_SECTION
 
+START_SECTION(template<typename T> T roundTo(const T value, int digits))
+{
+  TEST_REAL_SIMILAR(roundTo(3.14159265, 2), 3.14)
+  TEST_REAL_SIMILAR(roundTo(1234.9, -2), 1200)
+  TEST_REAL_SIMILAR(roundTo(1234.9, 0), 1235)
+  TEST_REAL_SIMILAR(roundTo(1234.9, -1), 1230)
+  TEST_REAL_SIMILAR(roundTo(1234.9, -3), 1000)
+}
+END_SECTION
+
+START_SECTION(template<typename T> double percentOf(T value, T total, int digits))
+{
+  TEST_REAL_SIMILAR(percentOf(1.0 / 3, 1.0, 2), 33.33)
+  TEST_REAL_SIMILAR(percentOf(1.0 / 3, 1.0, 3), 33.333)
+  TEST_REAL_SIMILAR(percentOf(1.0 / 3, 1.0, 4), 33.3333)
+  
+  TEST_REAL_SIMILAR(percentOf(166.6666, 1000.0, 1), 16.7)
+
+  TEST_EXCEPTION(Exception::InvalidValue, percentOf(-1.0, 1000.0, 2))
+  TEST_EXCEPTION(Exception::InvalidValue, percentOf(1.0, -1000.0, 2))
+}
+END_SECTION
 
 START_SECTION((bool approximatelyEqual(double a, double b, double tol)))
-	TEST_EQUAL(approximatelyEqual(1.1, 1.1002, 0.1), true)
-	TEST_EQUAL(approximatelyEqual(1.1, 1.1002, 0.01), true)
-	TEST_EQUAL(approximatelyEqual(1.1, 1.1002, 0.001), true)
-	TEST_EQUAL(approximatelyEqual(1.1, 1.1002, 0.0001), false)
+	TEST_TRUE(approximatelyEqual(1.1, 1.1002, 0.1))
+	TEST_TRUE(approximatelyEqual(1.1, 1.1002, 0.01))
+	TEST_TRUE(approximatelyEqual(1.1, 1.1002, 0.001))
+	TEST_FALSE(approximatelyEqual(1.1, 1.1002, 0.0001))
 END_SECTION
 
 START_SECTION((template <typename T> T getPPM(T mz_obs, T mz_ref)))

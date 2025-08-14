@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Mathias Walzer $
@@ -46,6 +20,7 @@
 #include <OpenMS/FORMAT/FileHandler.h>
 #include <OpenMS/DATASTRUCTURES/DataValue.h>
 #include <OpenMS/METADATA/PeptideIdentification.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 #include <OpenMS/METADATA/ProteinIdentification.h>
 
 namespace OpenMS
@@ -72,7 +47,7 @@ namespace OpenMS
          
           Appends a vector of PeptideIdentification to another and prepares Percolator features in MetaInfo (With the respective key "CONCAT:" + search_engine).
          */
-        static void concatMULTISEPeptideIds(std::vector<PeptideIdentification>& all_peptide_ids, std::vector<PeptideIdentification>& new_peptide_ids, const String& search_engine);
+        static void concatMULTISEPeptideIds(PeptideIdentificationList& all_peptide_ids, PeptideIdentificationList& new_peptide_ids, const String& search_engine);
 
         /**
           @brief mergeMULTISEPeptideIds
@@ -82,7 +57,7 @@ namespace OpenMS
          
           Merges a vector of PeptideIdentification into another and prepares the merged MetaInfo and scores for collection in addMULTISEFeatures for feature registration.
          */
-        static void mergeMULTISEPeptideIds(std::vector<PeptideIdentification>& all_peptide_ids, std::vector<PeptideIdentification>& new_peptide_ids, const String& search_engine);
+        static void mergeMULTISEPeptideIds(PeptideIdentificationList& all_peptide_ids, PeptideIdentificationList& new_peptide_ids, const String& search_engine);
 
         /**
           @brief mergeMULTISEProteinIds
@@ -101,7 +76,7 @@ namespace OpenMS
          
           Creates and adds MSGF+ specific Percolator features and registers them in feature_set. MSGF+ should be run with the addFeatures flag enabled.
          */
-        static void addMSGFFeatures(std::vector<PeptideIdentification>& peptide_ids, StringList& feature_set);
+        static void addMSGFFeatures(PeptideIdentificationList& peptide_ids, StringList& feature_set);
 
         /**
           @brief addXTANDEMFeatures
@@ -110,7 +85,7 @@ namespace OpenMS
          
           Creates and adds X!Tandem specific Percolator features and registers them in feature_set
          */
-        static void addXTANDEMFeatures(std::vector<PeptideIdentification>& peptide_ids, StringList& feature_set);
+        static void addXTANDEMFeatures(PeptideIdentificationList& peptide_ids, StringList& feature_set);
 
         /**
           @brief addCOMETFeatures
@@ -119,7 +94,7 @@ namespace OpenMS
          
           Creates and adds Comet specific Percolator features and registers them in feature_set
          */
-        static void addCOMETFeatures(std::vector<PeptideIdentification>& peptide_ids, StringList& feature_set);
+        static void addCOMETFeatures(PeptideIdentificationList& peptide_ids, StringList& feature_set);
 
         /**
           @brief addMASCOTFeatures
@@ -128,7 +103,7 @@ namespace OpenMS
          
           Creates and adds Mascot specific Percolator features and registers them in feature_set
          */
-        static void addMASCOTFeatures(std::vector<PeptideIdentification>& peptide_ids, StringList& feature_set);
+        static void addMASCOTFeatures(PeptideIdentificationList& peptide_ids, StringList& feature_set);
 
         /**
           @brief addMULTISEFeatures
@@ -140,7 +115,7 @@ namespace OpenMS
          
           Adds multiple search engine specific Percolator features and registers them in feature_set
          */
-        static void addMULTISEFeatures(std::vector<PeptideIdentification>& peptide_ids, StringList& search_engines_used, StringList& feature_set, bool complete_only = true, bool limits_imputation = false);
+        static void addMULTISEFeatures(PeptideIdentificationList& peptide_ids, StringList& search_engines_used, StringList& feature_set, bool complete_only = true, bool limits_imputation = false);
 
         /**
           @brief addCONCATSEFeatures
@@ -150,7 +125,7 @@ namespace OpenMS
          
           Adds multiple search engine specific Percolator features and registers them in feature_set
         */
-        static void addCONCATSEFeatures(std::vector<PeptideIdentification>& peptide_id_list, StringList& search_engines_used, StringList& feature_set);
+        static void addCONCATSEFeatures(PeptideIdentificationList& peptide_id_list, StringList& search_engines_used, StringList& feature_set);
 
         /**
           @brief checkExtraFeatures
@@ -178,7 +153,7 @@ namespace OpenMS
         static void assignDeltaScore_(std::vector<PeptideHit>& hits, const String& score_ref, const String& output_ref);
 
         /// gets the scan identifier to merge by
-        static String getScanMergeKey_(std::vector<PeptideIdentification>::iterator it, std::vector<PeptideIdentification>::iterator start);
+        static String getScanMergeKey_(PeptideIdentificationList::iterator it, PeptideIdentificationList::iterator start);
 
         /// For accession dependent sorting of ProteinHits
         struct lq_ProteinHit

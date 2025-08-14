@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow $
@@ -57,9 +31,9 @@ std::vector<FASTAFile::FASTAEntry> toFASTAVec(const QStringList& sl_prot, const 
 }
 
 
-std::vector<PeptideIdentification> toPepVec(const QStringList& sl_pep)
+PeptideIdentificationList toPepVec(const QStringList& sl_pep)
 {
-  std::vector<PeptideIdentification> pep_vec;
+  PeptideIdentificationList pep_vec;
   for (int i = 0; i < sl_pep.size(); ++i)
   {
     PeptideHit hit;
@@ -94,7 +68,7 @@ START_SECTION(virtual ~PeptideIndexing())
 END_SECTION
 
 
-START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::vector<ProteinIdentification>& prot_ids, std::vector<PeptideIdentification>& pep_ids)))
+START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::vector<ProteinIdentification>& prot_ids, PeptideIdentificationList& pep_ids)))
 {
   // regression test: https://github.com/OpenMS/OpenMS/issues/3447
   {
@@ -104,7 +78,7 @@ START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::
     indexer.setParameters(p);
     std::vector<FASTAFile::FASTAEntry> proteins = toFASTAVec(QStringList() << "AAAKEEEKTTTK");
     std::vector<ProteinIdentification> prot_ids;
-    std::vector<PeptideIdentification> pep_ids = toPepVec(QStringList() << "EEEK(Label:13C(6))");
+    PeptideIdentificationList pep_ids = toPepVec(QStringList() << "EEEK(Label:13C(6))");
     indexer.run(proteins, prot_ids, pep_ids);
     TEST_EQUAL(pep_ids[0].getHits()[0].extractProteinAccessionsSet().size(), 1); // one exact hit
     indexer.run(proteins, prot_ids, pep_ids);
@@ -118,7 +92,7 @@ START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::
   // easy case:
   std::vector<FASTAFile::FASTAEntry> proteins = toFASTAVec(QStringList() << "*MLT*EAXK"); // 1 X!!  ; extra * chars (should be ignored)
   std::vector<ProteinIdentification> prot_ids;
-  std::vector<PeptideIdentification> pep_ids = toPepVec(QStringList() << "MLTEAEK"); // requires 1 ambAA
+  PeptideIdentificationList pep_ids = toPepVec(QStringList() << "MLTEAEK"); // requires 1 ambAA
   p.setValue("aaa_max", 0);
   p.setValue("decoy_string", "DECOY_");
   pi.setParameters(p);
@@ -142,7 +116,7 @@ START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::
     p.setValue("aaa_max", i_aa);
     pi.setParameters(p);
     std::vector<FASTAFile::FASTAEntry> proteins_local = proteins;
-    std::vector<PeptideIdentification> pep_ids_local = pep_ids;
+    PeptideIdentificationList pep_ids_local = pep_ids;
     r = pi.run(proteins_local, prot_ids, pep_ids_local);
     for (Size i = 0; i < pep_ids.size(); ++i)
     {
@@ -165,7 +139,7 @@ START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::
     p.setValue("aaa_max", i_aa);
     pi.setParameters(p);
     std::vector<FASTAFile::FASTAEntry> proteins_local = proteins;
-    std::vector<PeptideIdentification> pep_ids_local = pep_ids;
+    PeptideIdentificationList pep_ids_local = pep_ids;
     pi.run(proteins_local, prot_ids, pep_ids_local);
     for (Size i = 0; i < pep_ids.size(); ++i)
     {
@@ -225,7 +199,7 @@ START_SECTION((ExitCodes run(std::vector<FASTAFile::FASTAEntry>& proteins, std::
 
   // auto mode for decoy strings and position
   std::vector<ProteinIdentification> prot_ids_2;
-  std::vector<PeptideIdentification> pep_ids_2;
+  PeptideIdentificationList pep_ids_2;
 
   {
   // simple prefix

@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -40,7 +14,7 @@
 
 #include <OpenMS/CONCEPT/LogStream.h>
 #include <OpenMS/FORMAT/InspectOutfile.h>
-#include <QRegExp>
+#include <QtCore/QRegularExpression>
 
 #include <fstream>
 
@@ -75,7 +49,7 @@ namespace OpenMS
     return true;
   }
 
-  vector<Size> InspectOutfile::load(const String& result_filename, vector<PeptideIdentification>& peptide_identifications,
+  vector<Size> InspectOutfile::load(const String& result_filename, PeptideIdentificationList& peptide_identifications,
                                     ProteinIdentification& protein_identification, const double p_value_threshold, const String& database_filename)
   {
     // check whether the p_value is correct
@@ -293,7 +267,7 @@ namespace OpenMS
     }
 
     if (!peptide_identifications.empty())
-      peptide_identifications.back().assignRanks();
+      peptide_identifications.back().sort();
 
     // search the sequence of the proteins
     if (!protein_identification.getHits().empty() && !database_filename.empty())
@@ -562,7 +536,7 @@ namespace OpenMS
   void
   InspectOutfile::getPrecursorRTandMZ(
     const vector<pair<String, vector<pair<Size, Size> > > >& files_and_peptide_identification_with_scan_number,
-    vector<PeptideIdentification>& ids)
+    PeptideIdentificationList& ids)
   {
     PeakMap experiment;
     String type;
@@ -1153,12 +1127,13 @@ namespace OpenMS
     protein_identification.setSearchEngineVersion("unknown");
     // searching for something like this: InsPecT version 20060907, InsPecT version 20100331
     QString response(cmd_output.toQString());
-    QRegExp rx("InsPecT (version|vesrion) (\\d+)"); // older versions of InsPecT have typo...
-    if (rx.indexIn(response) == -1)
+    QRegularExpression rx("InsPecT (version|vesrion) (\\d+)"); // older versions of InsPecT have typo...
+    auto match = rx.match(response);
+    if (!match.hasMatch())
     {
       return false;
     }
-    protein_identification.setSearchEngineVersion(String(rx.cap(2)));
+    protein_identification.setSearchEngineVersion(match.captured(2));
     return true;
   }
 

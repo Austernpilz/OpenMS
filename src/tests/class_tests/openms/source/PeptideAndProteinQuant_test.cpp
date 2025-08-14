@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Hendrik Weisser $
@@ -95,10 +69,10 @@ START_SECTION((void readQuantData(ConsensusMap& consensus, ExperimentalDesign& e
 }
 END_SECTION
 
-START_SECTION((void readQuantData(vector<ProteinIdentification>& proteins, vector<PeptideIdentification>& peptides, ExperimentalDesign& ed)))
+START_SECTION((void readQuantData(vector<ProteinIdentification>& proteins, PeptideIdentificationList& peptides, ExperimentalDesign& ed)))
 {
   vector<ProteinIdentification> proteins;
-  vector<PeptideIdentification> peptides;
+  PeptideIdentificationList peptides;
   IdXMLFile().load(OPENMS_GET_TEST_DATA_PATH("ProteinQuantifier_input.idXML"), proteins, peptides);
   TEST_EQUAL(quantifier_identifications.getPeptideResults().empty(), true);
   ExperimentalDesign design = ExperimentalDesign::fromIdentifications(proteins);
@@ -108,7 +82,7 @@ START_SECTION((void readQuantData(vector<ProteinIdentification>& proteins, vecto
 }
 END_SECTION
 
-START_SECTION((void quantifyPeptides(const std::vector<PeptideIdentification>& peptides = std::vector<PeptideIdentification>())))
+START_SECTION((void quantifyPeptides(const PeptideIdentificationList& peptides = PeptideIdentificationList())))
 {
   NOT_TESTABLE // tested together with the "readQuantData" methods
 }
@@ -185,7 +159,11 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_data.psm_count, 2);
   pep_data = pep_quant[AASequence::fromString("CCCCC")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 2); // two charges
+  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one file
+  auto& map_file_to_charges = *pep_data.abundances[1].begin();
+  TEST_EQUAL(map_file_to_charges.second.size(), 2); // two charges
+
+  
   TEST_EQUAL(pep_data.total_abundances.size(), 1);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 7777);
   TEST_EQUAL(pep_data.accessions.size(), 1);
@@ -197,7 +175,9 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_data.psm_count, 1);
   pep_data = pep_quant[AASequence::fromString("GGGGG")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one charge
+  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one file
+  TEST_EQUAL((*pep_data.abundances[1].begin()).second.size(), 1); // two charges  
+
   TEST_EQUAL(pep_data.total_abundances.size(), 1);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 7777);
   TEST_EQUAL(pep_data.accessions.size(), 2);
@@ -207,7 +187,9 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_quant.size(), 4);
   pep_data = pep_quant[AASequence::fromString("AAAK")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one charge
+  TEST_EQUAL(pep_data.abundances[1].size(), 2); // two files
+  TEST_EQUAL((*pep_data.abundances[1].begin()).second.size(), 1); // one charge
+
   TEST_EQUAL(pep_data.total_abundances.size(), 2);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 1000);
   TEST_REAL_SIMILAR(pep_data.total_abundances[2], 1000);
@@ -215,7 +197,9 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_data.psm_count, 1);
   pep_data = pep_quant[AASequence::fromString("CCCK")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one charge
+  TEST_EQUAL(pep_data.abundances[1].size(), 2); // two files
+  TEST_EQUAL((*pep_data.abundances[1].begin()).second.size(), 1); // one charge
+
   TEST_EQUAL(pep_data.total_abundances.size(), 2);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 200);
   TEST_REAL_SIMILAR(pep_data.total_abundances[1], 200);
@@ -223,7 +207,9 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_data.psm_count, 1);
   pep_data = pep_quant[AASequence::fromString("EEEK")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one charge
+  TEST_EQUAL(pep_data.abundances[1].size(), 3); // three files
+  TEST_EQUAL((*pep_data.abundances[1].begin()).second.size(), 1); // one charge
+
   TEST_EQUAL(pep_data.total_abundances.size(), 3);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 30);
   TEST_REAL_SIMILAR(pep_data.total_abundances[1], 30);
@@ -232,7 +218,9 @@ START_SECTION((const PeptideQuant& getPeptideResults()))
   TEST_EQUAL(pep_data.psm_count, 1);
   pep_data = pep_quant[AASequence::fromString("GGG")];
   TEST_EQUAL(pep_data.abundances.size(), 1); // one fraction
-  TEST_EQUAL(pep_data.abundances[1].size(), 1); // one charge
+  TEST_EQUAL(pep_data.abundances[1].size(), 2); // two files
+  TEST_EQUAL((*pep_data.abundances[1].begin()).second.size(), 1); // one charge
+
   TEST_EQUAL(pep_data.total_abundances.size(), 2);
   TEST_REAL_SIMILAR(pep_data.total_abundances[0], 4);
   TEST_REAL_SIMILAR(pep_data.total_abundances[1], 4);
@@ -249,12 +237,12 @@ START_SECTION((const ProteinQuant& getProteinResults()))
   prot_quant = quantifier_features.getProteinResults();
   TEST_EQUAL(prot_quant.size(), 2);
   prot_data = prot_quant["Protein0"];
-  TEST_EQUAL(prot_data.abundances.size(), 3);
+  TEST_EQUAL(prot_data.peptide_abundances.size(), 3);
   TEST_EQUAL(prot_data.total_abundances.size(), 1);
   TEST_REAL_SIMILAR(prot_data.total_abundances[0], 4711);
   TEST_EQUAL(prot_data.psm_count, 6);
   prot_data = prot_quant["Protein1"];
-  TEST_EQUAL(prot_data.abundances.size(), 1);
+  TEST_EQUAL(prot_data.peptide_abundances.size(), 1);
   TEST_EQUAL(prot_data.total_abundances.size(), 1);
   TEST_REAL_SIMILAR(prot_data.total_abundances[0], 8888);
   TEST_EQUAL(prot_data.psm_count, 2);
@@ -262,7 +250,7 @@ START_SECTION((const ProteinQuant& getProteinResults()))
   prot_quant = quantifier_consensus.getProteinResults();
   TEST_EQUAL(prot_quant.size(), 1);
   prot_data = prot_quant["Protein"];
-  TEST_EQUAL(prot_data.abundances.size(), 4);
+  TEST_EQUAL(prot_data.peptide_abundances.size(), 4);
   TEST_EQUAL(prot_data.total_abundances.size(), 3);
   TEST_REAL_SIMILAR(prot_data.total_abundances[0], 200);
   TEST_REAL_SIMILAR(prot_data.total_abundances[1], 30);
@@ -284,7 +272,7 @@ END_SECTION
 START_SECTION(([PeptideAndProteinQuant::ProteinData] ProteinData()))
 {
   PeptideAndProteinQuant::ProteinData data;
-  TEST_EQUAL(data.abundances.empty(), true);
+  TEST_EQUAL(data.peptide_abundances.empty(), true);
   TEST_EQUAL(data.total_abundances.empty(), true);
   TEST_EQUAL(data.psm_count, 0);
 }
@@ -382,6 +370,7 @@ START_SECTION((const ProteinQuant& getProteinResults()))
   TEST_REAL_SIMILAR(protein.total_abundances[2], 257.5);
 }
 END_SECTION
+
 
 /////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////

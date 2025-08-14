@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow $
@@ -37,9 +11,16 @@
 
 #include <cstddef>   // for size_t
 #include <vector>
+#include <algorithm>
+#include <concepts>
 
 namespace OpenMS
 {
+  template<typename T>
+  concept LessThanComparable = requires(const T& a, const T& b) { // less and greater
+      { a < b } -> std::convertible_to<bool>;
+  };
+
 
 /// Macro to expose common dependent types, such as @p iterator in the derived class
 #define EXPOSED_VECTOR_INTERFACE(InnerElement) \
@@ -214,6 +195,134 @@ namespace OpenMS
     {
       return data_.insert(where, from, to);
     }
+    
+    /// Clear all elements
+    void clear() noexcept
+    {
+      data_.clear();
+    }
+    
+    /// Get reverse iterator to beginning
+    reverse_iterator rbegin() noexcept
+    {
+      return data_.rbegin();
+    }
+    
+    /// Get const reverse iterator to beginning
+    const_reverse_iterator rbegin() const noexcept
+    {
+      return data_.rbegin();
+    }
+    
+    /// Get reverse iterator to end
+    reverse_iterator rend() noexcept
+    {
+      return data_.rend();
+    }
+    
+    /// Get const reverse iterator to end
+    const_reverse_iterator rend() const noexcept
+    {
+      return data_.rend();
+    }
+    
+    /// Get const reverse iterator to beginning
+    const_reverse_iterator crbegin() const noexcept
+    {
+      return data_.crbegin();
+    }
+    
+    /// Get const reverse iterator to end
+    const_reverse_iterator crend() const noexcept
+    {
+      return data_.crend();
+    }
+    
+    /// Swap contents with another ExposedVector
+    void swap(ExposedVector& other) noexcept
+    {
+      data_.swap(other.data_);
+    }
+    
+    /// Assign values from iterators
+    template<typename InputIt>
+    void assign(InputIt first, InputIt last)
+    {
+      data_.assign(first, last);
+    }
+    
+    /// Assign n copies of value
+    void assign(size_type count, const VectorElement& value)
+    {
+      data_.assign(count, value);
+    }
+    
+    /// Assign from initializer list
+    void assign(std::initializer_list<VectorElement> init)
+    {
+      data_.assign(init);
+    }
+    
+    /// Get first element
+    VectorElement& front() noexcept
+    {
+      return data_.front();
+    }
+    
+    /// Get first element (const)
+    const VectorElement& front() const noexcept
+    {
+      return data_.front();
+    }
+    
+    /// Get maximum possible size
+    size_type max_size() const noexcept
+    {
+      return data_.max_size();
+    }
+    
+    /// Get current capacity
+    size_type capacity() const noexcept
+    {
+      return data_.capacity();
+    }
+    
+    /// Shrink capacity to fit size
+    void shrink_to_fit()
+    {
+      data_.shrink_to_fit();
+    }
+    
+    /// Insert single element
+    iterator insert(const_iterator pos, const VectorElement& value)
+    {
+      return data_.insert(pos, value);
+    }
+    
+    /// Insert single element (move)
+    iterator insert(const_iterator pos, VectorElement&& value)
+    {
+      return data_.insert(pos, std::move(value));
+    }
+    
+    /// Insert n copies of value
+    iterator insert(const_iterator pos, size_type count, const VectorElement& value)
+    {
+      return data_.insert(pos, count, value);
+    }
+    
+    /// Insert from initializer list
+    iterator insert(const_iterator pos, std::initializer_list<VectorElement> init)
+    {
+      return data_.insert(pos, init);
+    }
+    
+    /// Emplace element at position
+    template<typename... Args>
+    iterator emplace(const_iterator pos, Args&&... args)
+    {
+      return data_.emplace(pos, std::forward<Args>(args)...);
+    }
 
     /// read-only access to the underlying data
     const VecMember& getData() const
@@ -225,6 +334,38 @@ namespace OpenMS
     {
       return data_;
     }
-  };
+    
+    /// Equality comparison
+    bool operator==(const ExposedVector& other) const
+    {
+      return data_ == other.data_;
+    }
+    
+    /// Inequality comparison
+    bool operator!=(const ExposedVector& other) const
+    {
+      return data_ != other.data_;
+    }
+    
+    // Define operators only if underlying vector supports them
+    bool operator<(const ExposedVector& other) const requires LessThanComparable<VectorElement>
+    {
+        return data_ < other.data_;
+    }
 
+    bool operator<=(const ExposedVector& other) const requires LessThanComparable<VectorElement>
+    {
+        return data_ <= other.data_;
+    }
+
+    bool operator>(const ExposedVector& other) const requires LessThanComparable<VectorElement>
+    {
+        return data_ > other.data_;
+    }
+
+    bool operator>=(const ExposedVector& other) const requires LessThanComparable<VectorElement>
+    {
+        return data_ >= other.data_;
+    }
+   };
 } // namespace OpenMS

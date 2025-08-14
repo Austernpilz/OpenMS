@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow $
@@ -39,7 +13,7 @@
 #include <OpenMS/ANALYSIS/ID/IDScoreGetterSetter.h>
 #include <OpenMS/CONCEPT/LogStream.h>
 #include <OpenMS/DATASTRUCTURES/StringUtils.h>
-#include <OpenMS/FILTERING/ID/IDFilter.h>
+#include <OpenMS/PROCESSING/ID/IDFilter.h>
 #include <OpenMS/METADATA/ProteinIdentification.h>
 
 #include <algorithm>
@@ -78,16 +52,13 @@ namespace OpenMS
     if (isHigherBetter) return first > second; else return first < second;
   }
 
-  void FalseDiscoveryRate::apply(vector<PeptideIdentification>& ids, bool annotate_peptide_fdr) const
+  void FalseDiscoveryRate::apply(PeptideIdentificationList& ids, bool annotate_peptide_fdr) const
   {
     bool q_value = !param_.getValue("no_qvalues").toBool();
     bool use_all_hits = param_.getValue("use_all_hits").toBool();
     bool treat_runs_separately = param_.getValue("treat_runs_separately").toBool();
     bool split_charge_variants = param_.getValue("split_charge_variants").toBool();
     bool add_decoy_peptides = param_.getValue("add_decoy_peptides").toBool();
-#ifdef FALSE_DISCOVERY_RATE_DEBUG
-    cerr << "Parameters: no_qvalues=" << !q_value << ", use_all_hits=" << use_all_hits << ", treat_runs_separately=" << treat_runs_separately << ", split_charge_variants=" << split_charge_variants << endl;
-#endif
 
     if (ids.empty())
     {
@@ -385,7 +356,7 @@ namespace OpenMS
                 }
                 if (q_value)
                 {
-                  hit.setMetaValue("peptide q-value", peptide_fdr);
+                  hit.setMetaValue(Constants::UserParam::PEPTIDE_Q_VALUE, peptide_fdr);
                 }
                 else
                 {
@@ -407,7 +378,7 @@ namespace OpenMS
     }
 
     // higher-score-better can be set now, calculations are finished
-    for (vector<PeptideIdentification>::iterator it = ids.begin(); it != ids.end(); ++it)
+    for (PeptideIdentificationList::iterator it = ids.begin(); it != ids.end(); ++it)
     {
       if (q_value)
       {
@@ -424,13 +395,13 @@ namespace OpenMS
         }
       }
       it->setHigherScoreBetter(false);
-      it->assignRanks();
+      it->sort();
     }
 
     return;
   }
 
-  void FalseDiscoveryRate::apply(vector<PeptideIdentification>& fwd_ids, vector<PeptideIdentification>& rev_ids) const
+  void FalseDiscoveryRate::apply(PeptideIdentificationList& fwd_ids, PeptideIdentificationList& rev_ids) const
   {
     if (fwd_ids.empty() || rev_ids.empty())
     {
@@ -438,7 +409,7 @@ namespace OpenMS
     }
     vector<double> target_scores, decoy_scores;
     // get the scores of all peptide hits
-    for (vector<PeptideIdentification>::const_iterator it = fwd_ids.begin(); it != fwd_ids.end(); ++it)
+    for (PeptideIdentificationList::const_iterator it = fwd_ids.begin(); it != fwd_ids.end(); ++it)
     {
       for (vector<PeptideHit>::const_iterator pit = it->getHits().begin(); pit != it->getHits().end(); ++pit)
       {
@@ -446,7 +417,7 @@ namespace OpenMS
       }
     }
 
-    for (vector<PeptideIdentification>::const_iterator it = rev_ids.begin(); it != rev_ids.end(); ++it)
+    for (PeptideIdentificationList::const_iterator it = rev_ids.begin(); it != rev_ids.end(); ++it)
     {
       for (vector<PeptideHit>::const_iterator pit = it->getHits().begin(); pit != it->getHits().end(); ++pit)
       {
@@ -463,7 +434,7 @@ namespace OpenMS
 
     // annotate fdr
     String score_type = fwd_ids.begin()->getScoreType() + "_score";
-    for (vector<PeptideIdentification>::iterator it = fwd_ids.begin(); it != fwd_ids.end(); ++it)
+    for (PeptideIdentificationList::iterator it = fwd_ids.begin(); it != fwd_ids.end(); ++it)
     {
       if (q_value)
       {
@@ -490,7 +461,7 @@ namespace OpenMS
     if (add_decoy_peptides)
     {
       score_type = rev_ids.begin()->getScoreType() + "_score";
-      for (vector<PeptideIdentification>::iterator it = rev_ids.begin(); it != rev_ids.end(); ++it)
+      for (PeptideIdentificationList::iterator it = rev_ids.begin(); it != rev_ids.end(); ++it)
       {
         if (q_value)
         {
@@ -909,7 +880,7 @@ namespace OpenMS
   //TODO does not support "by run" and/or "by charge"
   //TODO could be done for a percentage of FalsePos instead of a number
   //TODO can be templated for proteins
-  double FalseDiscoveryRate::rocN(const vector<PeptideIdentification>& ids, Size fp_cutoff) const
+  double FalseDiscoveryRate::rocN(const PeptideIdentificationList& ids, Size fp_cutoff) const
   {
     bool higher_score_better(ids.begin()->isHigherScoreBetter());
     bool use_all_hits = param_.getValue("use_all_hits").toBool();
@@ -934,7 +905,7 @@ namespace OpenMS
     return rocN(scores_labels, fp_cutoff == 0 ? scores_labels.size() : fp_cutoff);
   }
 
-  double FalseDiscoveryRate::rocN(const vector<PeptideIdentification>& ids, Size fp_cutoff, const String& identifier) const
+  double FalseDiscoveryRate::rocN(const PeptideIdentificationList& ids, Size fp_cutoff, const String& identifier) const
   {
     bool higher_score_better(ids.begin()->isHigherScoreBetter());
     bool use_all_hits = param_.getValue("use_all_hits").toBool();
@@ -1154,7 +1125,7 @@ namespace OpenMS
     scores_to_FDR.clear();
   }
 
-  void FalseDiscoveryRate::applyBasic(const std::vector<ProteinIdentification> & run_info, std::vector<PeptideIdentification> & ids)
+  void FalseDiscoveryRate::applyBasic(const std::vector<ProteinIdentification> & run_info, PeptideIdentificationList & ids)
   {
     if (ids.empty()) return;
     bool treat_runs_separately = param_.getValue("treat_runs_separately").toBool();
@@ -1220,7 +1191,7 @@ namespace OpenMS
   {
     bool q_value = !param_.getValue("no_qvalues").toBool();
     //TODO Check naming conventions. Ontology?
-    const string& score_type = q_value ? "peptide q-value" : "peptide FDR";
+    const string& score_type = q_value ? Constants::UserParam::PEPTIDE_Q_VALUE : "peptide FDR";
     bool add_decoy_peptides = param_.getValue("add_decoy_peptides").toBool();
     // since we do not support multiple runs here yet, we take the orientation of the first ID
     bool higher_better = true;
@@ -1260,11 +1231,11 @@ namespace OpenMS
     IDScoreGetterSetter::setPeptideScoresFromMap_(seq_to_score_labels, map, score_type, add_decoy_peptides, include_unassigned);
   }
 
-  void FalseDiscoveryRate::applyBasicPeptideLevel(std::vector<PeptideIdentification> & ids)
+  void FalseDiscoveryRate::applyBasicPeptideLevel(PeptideIdentificationList & ids)
   {
     bool q_value = !param_.getValue("no_qvalues").toBool();
     //TODO Check naming conventions. Ontology?
-    const string& score_type = q_value ? "peptide q-value" : "peptide FDR";
+    const string& score_type = q_value ? Constants::UserParam::PEPTIDE_Q_VALUE : "peptide FDR";
     bool add_decoy_peptides = param_.getValue("add_decoy_peptides").toBool();
     // since we do not support multiple runs here yet, we take the orientation of the first ID
     bool higher_better = ids[0].isHigherScoreBetter();
@@ -1298,7 +1269,7 @@ namespace OpenMS
   }
 
   // TODO why again do we need higher_score_better here?
-  void FalseDiscoveryRate::applyBasic(std::vector<PeptideIdentification> & ids, bool higher_score_better, int charge, String identifier, bool only_best_per_pep)
+  void FalseDiscoveryRate::applyBasic(PeptideIdentificationList & ids, bool higher_score_better, int charge, String identifier, bool only_best_per_pep)
   {
     bool q_value = !param_.getValue("no_qvalues").toBool();
     //TODO Check naming conventions. Ontology?
@@ -1367,7 +1338,7 @@ namespace OpenMS
     }
     calculateFDRBasic_(scores_to_FDR, scores_labels, q_value, higher_score_better);
     if (!scores_labels.empty())
-      IDScoreGetterSetter::setScores_<PeptideIdentification>(scores_to_FDR, ids, score_type, false, add_decoy_peptides);
+      IDScoreGetterSetter::setScores_<PeptideIdentification>(scores_to_FDR, ids.getData(), score_type, false, add_decoy_peptides);
     scores_to_FDR.clear();
   }
 

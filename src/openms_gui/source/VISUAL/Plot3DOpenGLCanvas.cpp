@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -38,7 +12,7 @@
 #include <OpenMS/VISUAL/AxisTickCalculator.h>
 #include <OpenMS/VISUAL/LayerDataPeak.h>
 
-#include <OpenMS/MATH/MISC/MathFunctions.h>
+#include <OpenMS/MATH/MathFunctions.h>
 
 #include <QMouseEvent>
 
@@ -552,8 +526,9 @@ namespace OpenMS
         }
 
         const auto area = canvas_3d_.visible_area_.getAreaUnit();
-        auto begin_it = layer.getPeakData()->areaBeginConst(area.getMinRT(), area.getMaxRT(), area.getMinMZ(), area.getMaxMZ());
-        auto end_it = layer.getPeakData()->areaEndConst();
+        const MSExperiment& peak_data = layer.getPeakData()->getMSExperiment();
+        auto begin_it = peak_data.areaBeginConst(area.getMinRT(), area.getMaxRT(), area.getMinMZ(), area.getMaxMZ());
+        auto end_it = peak_data.areaEndConst();
 
         // count peaks in area
         int count = std::distance(begin_it, end_it);
@@ -581,7 +556,8 @@ namespace OpenMS
           }
 
           PeakIndex pi = it.getPeakIndex();
-          if (layer.filters.passes((*layer.getPeakData())[pi.spectrum], pi.peak))
+          const MSExperiment& peak_data = layer.getPeakData()->getMSExperiment();
+          if (layer.filters.passes(peak_data[pi.spectrum], pi.peak))
           {
             glBegin(GL_POINTS);
             double intensity = 0;
@@ -641,8 +617,9 @@ namespace OpenMS
         glLineWidth(layer.param.getValue("dot:line_width"));
 
         const auto area = canvas_3d_.visible_area_.getAreaUnit();
-        auto begin_it = layer.getPeakData()->areaBeginConst(area.getMinRT(), area.getMaxRT(), area.getMinMZ(), area.getMaxMZ());
-        auto end_it = layer.getPeakData()->areaEndConst();
+        const MSExperiment& peak_data = layer.getPeakData()->getMSExperiment();
+        auto begin_it = peak_data.areaBeginConst(area.getMinRT(), area.getMaxRT(), area.getMinMZ(), area.getMaxMZ());
+        auto end_it = peak_data.areaEndConst();
         // count peaks in area
         int count = std::distance(begin_it, end_it);
 
@@ -669,7 +646,8 @@ namespace OpenMS
           }
 
           PeakIndex pi = it.getPeakIndex();
-          if (layer.filters.passes((*layer.getPeakData())[pi.spectrum], pi.peak))
+          const MSExperiment& peak_data = layer.getPeakData()->getMSExperiment();
+          if (layer.filters.passes(peak_data[pi.spectrum], pi.peak))
           {
             glBegin(GL_LINES);
             double intensity = 0;
@@ -1042,11 +1020,11 @@ namespace OpenMS
       }
       else if (canvas_3d_.action_mode_ == PlotCanvas::AM_TRANSLATE)
       {
-        Int x_angle = xrot_ + 8 * (e->y() - mouse_move_end_.y());
+        Int x_angle = xrot_ + 8 * (e->position().y() - mouse_move_end_.y());
         normalizeAngle(&x_angle);
         xrot_ = x_angle;
 
-        Int y_angle = yrot_ + 8 * (e->x() - mouse_move_end_.x());
+        Int y_angle = yrot_ + 8 * (e->position().x() - mouse_move_end_.x());
         normalizeAngle(&y_angle);
         yrot_ = y_angle;
 
@@ -1113,8 +1091,9 @@ namespace OpenMS
     for (Size i = 0; i < canvas_3d_.getLayerCount(); i++)
     {
       const auto& layer = dynamic_cast<const LayerDataPeak&>(canvas_3d_.getLayer(i));
-      auto rt_begin_it = layer.getPeakData()->RTBegin(area.getMinRT());
-      auto rt_end_it = layer.getPeakData()->RTEnd(area.getMaxRT());
+      const MSExperiment& peak_data = layer.getPeakData()->getMSExperiment();
+      auto rt_begin_it = peak_data.RTBegin(area.getMinRT());
+      auto rt_end_it = peak_data.RTEnd(area.getMaxRT());
 
       for (auto spec_it = rt_begin_it; spec_it != rt_end_it; ++spec_it)
       {

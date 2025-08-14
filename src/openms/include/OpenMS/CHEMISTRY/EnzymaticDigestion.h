@@ -1,35 +1,9 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Chris Bielow, Xiao Liang $
-// $Authors: Marc Sturm, Chris Bielow $
+// $Authors: Marc Sturm, Chris Bielow, Jeremi Maciejewski $
 // --------------------------------------------------------------------------
 
 #pragma once
@@ -174,6 +148,7 @@ namespace OpenMS
      */
     bool filterByMissedCleavages(const String& sequence, const std::function<bool(const Int)>& filter) const;
 
+
   protected:
     /**
       @brief supports functionality for ProteaseDigestion as well (which is deeply weaved into the function)
@@ -203,6 +178,25 @@ namespace OpenMS
       @return Cleavage positions (this includes @p start, but not @p end)
      */
     std::vector<int> tokenize_(const String& sequence, int start = 0, int end = -1) const;
+
+    /**
+      @brief Generates semi-specific digestion products
+
+      Function handling semi-specific digestion (specificity_ == Specificity::SPEC_SEMI).
+      It is intended for calling after tokenizing and missed cleavages variants generation.
+      Fully-specific variants are skipped.
+      Also generates semi-specific variants with missed cleavages.
+
+      @param cleavage_positions A (sorted!) vector of cleavage positions, as returned by tokenize_(). First and last cleavage should be sequence termini.
+      @param output A vector into which produced variants are emplaced.
+      @param min_length Minimal length of reported products
+      @param max_length Maximal length of reported products
+
+      @return number of digestion products NOT matching the length restrictions.
+      @throw Exception::InvalidValue if number of cleavage_positions is smaller than 2 (at least sequence termini are required).
+      @throw Exception::Precondition if vector cleavage_positions is not sorted.
+    */
+    Size semiSpecificDigestion_(const std::vector<int>& cleavage_positions, std::vector<std::pair<Size, Size>>& output, Size min_length = 0, Size max_length = -1) const;
 
     /**
        @brief Helper function for digestUnmodified()

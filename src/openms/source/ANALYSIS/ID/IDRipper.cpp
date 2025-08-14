@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg$
@@ -36,7 +10,7 @@
 #include <OpenMS/CONCEPT/LogStream.h>
 #include <OpenMS/CONCEPT/Constants.h>
 
-#include <QDir>
+#include <QtCore/QDir>
 #include <array>
 #include <unordered_set>
 
@@ -138,7 +112,7 @@ namespace OpenMS
     return prot_idents;
   }
 
-  const std::vector<PeptideIdentification> & IDRipper::RipFileContent::getPeptideIdentifications()
+  const PeptideIdentificationList & IDRipper::RipFileContent::getPeptideIdentifications()
   {
     return pep_idents;
   }
@@ -161,7 +135,7 @@ namespace OpenMS
   void IDRipper::rip(
           RipFileMap& ripped,
           vector<ProteinIdentification>& proteins,
-          vector<PeptideIdentification>& peptides,
+          PeptideIdentificationList& peptides,
           bool numeric_filenames,
           bool split_ident_runs)
   {
@@ -273,7 +247,7 @@ namespace OpenMS
         protein_idents.push_back(std::move(p));
 
         //create new peptide identification
-        vector<PeptideIdentification> peptide_idents;
+        PeptideIdentificationList peptide_idents;
         peptide_idents.push_back(pep);
 
         //create and insert new map entry
@@ -334,7 +308,7 @@ namespace OpenMS
         }
 
         // add current peptide identification
-        vector<PeptideIdentification>& ripped_pep = it->second.pep_idents;
+        PeptideIdentificationList& ripped_pep = it->second.pep_idents;
         ripped_pep.push_back(pep);
       }
     }
@@ -368,7 +342,7 @@ namespace OpenMS
             std::vector<RipFileIdentifier> & rfis,
             std::vector<RipFileContent> & rfcs,
             std::vector<ProteinIdentification> & proteins,
-            std::vector<PeptideIdentification> & peptides,
+            PeptideIdentificationList & peptides,
             bool numeric_filenames,
             bool split_ident_runs)
   {
@@ -395,13 +369,13 @@ bool IDRipper::setOriginAnnotationMode_(short& mode, short const new_value)
   return true;
 }
 
-IDRipper::OriginAnnotationFormat IDRipper::detectOriginAnnotationFormat_(map<String, UInt>& file_origin_map, const std::vector<PeptideIdentification>& peptide_idents)
+IDRipper::OriginAnnotationFormat IDRipper::detectOriginAnnotationFormat_(map<String, UInt>& file_origin_map, const PeptideIdentificationList& peptide_idents)
   {
     // In case we observe 'file_origin' meta values, we assign an index to every unique meta value
     file_origin_map.clear();
 
     short mode = -1;
-    for (vector<PeptideIdentification>::const_iterator it = peptide_idents.begin(); it != peptide_idents.end(); ++it)
+    for (PeptideIdentificationList::const_iterator it = peptide_idents.begin(); it != peptide_idents.end(); ++it)
     {
       bool mode_identified = false;
       for (size_t i = 0; i < SIZE_OF_ORIGIN_ANNOTATION_FORMAT; ++i)

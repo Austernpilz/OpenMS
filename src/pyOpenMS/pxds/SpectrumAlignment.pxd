@@ -5,11 +5,12 @@ from DefaultParamHandler cimport *
 from MSSpectrum cimport *
 from Peak1D cimport *
 
-cdef extern from "<OpenMS/COMPARISON/SPECTRA/SpectrumAlignment.h>" namespace "OpenMS":
+cdef extern from "<OpenMS/COMPARISON/SpectrumAlignment.h>" namespace "OpenMS":
     
     cdef cppclass SpectrumAlignment(DefaultParamHandler) :
         # wrap-inherits:
         #  DefaultParamHandler
+
         # wrap-doc:
         #  Aligns the peaks of two sorted spectra
         #  Method 1: Using a banded (width via 'tolerance' parameter) alignment if absolute tolerances are given
@@ -20,7 +21,7 @@ cdef extern from "<OpenMS/COMPARISON/SPECTRA/SpectrumAlignment.h>" namespace "Op
         #  note: A peak in s2 can be matched to none, one or multiple peaks in s1. Peaks in s1 may be matched to none or one peak in s2
         #  note: Intensity is ignored 
 
-        SpectrumAlignment() nogil except +
-        SpectrumAlignment(SpectrumAlignment &) nogil except +
+        SpectrumAlignment() except + nogil 
+        SpectrumAlignment(SpectrumAlignment &) except + nogil 
 
-        void getSpectrumAlignment(libcpp_vector[ libcpp_pair[ Size, Size ] ] & alignment, MSSpectrum & s1, MSSpectrum & s2) nogil except +  # wrap-ignore
+        void getSpectrumAlignment(libcpp_vector[ libcpp_pair[ Size, Size ] ] & alignment, MSSpectrum & s1, MSSpectrum & s2) except + nogil   # wrap-ignore

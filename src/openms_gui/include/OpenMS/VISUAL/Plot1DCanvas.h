@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg$
@@ -444,6 +418,12 @@ public:
       return point;
     }
 
+    /// overload to call the 1D version (which has min-intensity of '0')
+    virtual const RangeType& getDataRange() const override
+    { 
+      return overall_data_range_1d_;
+    }
+
     /**
      * \brief Pushes a data point back into the valid data range of the current layer area. Useful for annotation items which were mouse-dragged outside the range by the user.
      * \tparam T A data point, e.g. Peak1D, which may be outside the data area
@@ -533,7 +513,7 @@ signals:
     /// Requests to display all spectra in 3D plot
     void showCurrentPeaksAs3D();
 
-    /// Requests to display all spectra in ion mobility plot
+    /// Requests to display this spectrum (=frame) in ion mobility plot
     void showCurrentPeaksAsIonMobility(const MSSpectrum& spec);
 
     /// Requests to display all spectra as DIA
@@ -607,7 +587,7 @@ protected:
     void drawAlignment_(QPainter& painter);
 
     /// internal method, called before calling parent function PlotCanvas::changeVisibleArea_
-    void changeVisibleAreaCommon_(const UnitRange& new_area, bool repaint, bool add_to_stack);
+    void changeVisibleArea1D_(const UnitRange& new_area, bool repaint, bool add_to_stack);
 
     // Docu in base class
     void changeVisibleArea_(VisibleArea new_area, bool repaint = true, bool add_to_stack = false) override;

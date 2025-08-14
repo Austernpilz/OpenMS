@@ -1,36 +1,12 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
 // $Authors: $
 // --------------------------------------------------------------------------
+
+#include <OpenMS/config.h>
 
 #include <OpenMS/KERNEL/ConsensusMap.h>
 #include <OpenMS/KERNEL/FeatureMap.h>
@@ -48,8 +24,28 @@ namespace OpenMS
 {
   ConsensusMap::ConsensusMap() = default;
 
-  ConsensusMap::ConsensusMap(const ConsensusMap& source) = default;
-  
+  ConsensusMap::ConsensusMap(const ConsensusMap& source) :
+    MetaInfoInterface(source),
+    RangeManagerContainerType(source),
+    DocumentIdentifier(source),
+    ExposedVector<ConsensusFeature>(source),
+    UniqueIdInterface(source),
+    UniqueIdIndexer<ConsensusMap>(source),
+    column_description_(source.column_description_),
+    experiment_type_(source.experiment_type_),
+    protein_identifications_(source.protein_identifications_),
+    unassigned_peptide_identifications_(source.unassigned_peptide_identifications_),
+    data_processing_(source.data_processing_),
+    id_data_() // updated below
+  {
+    // copy ID data and update references in features:
+    IdentificationData::RefTranslator trans = id_data_.merge(source.id_data_);
+    for (ConsensusFeature& feature : *this)
+    {
+      feature.updateIDReferences(trans);
+    }
+  }
+
   ConsensusMap::ConsensusMap(ConsensusMap&& source) = default;
 
   ConsensusMap::~ConsensusMap() = default;
@@ -100,7 +96,7 @@ namespace OpenMS
                                     rhs.protein_identifications_.end());
 
     // ensure non-redundant modification parameter
-    for (auto & pi : protein_identifications_)
+    for (auto& pi : protein_identifications_)
     {
       std::vector<String>::iterator it_2;
 
@@ -122,8 +118,16 @@ namespace OpenMS
                                                rhs.unassigned_peptide_identifications_.begin(),
                                                rhs.unassigned_peptide_identifications_.end());
 
+    Size old_size = size();
     // append consensusElements to consensusElementList:
     this->insert(this->end(), rhs.begin(), rhs.end());
+
+    // combine IDs (new format):
+    IdentificationData::RefTranslator trans = id_data_.merge(rhs.id_data_);
+    // update IDs in new consensus features:
+    for (Size i = old_size; i < size(); ++i) {
+      (*this)[i].updateIDReferences(trans);
+    }
 
     // consistency
     try
@@ -161,19 +165,18 @@ namespace OpenMS
 
     // append column headers (file descriptions) and increase column index (map index)
     Size lhs_map_size = column_description_.size();
-    for (auto const & rhsfd : rhs.column_description_)
+    for (const auto& rhsfd : rhs.column_description_)
     {
-      column_description_.insert(
-        std::make_pair(lhs_map_size + rhsfd.first, rhsfd.second));
+      column_description_.insert(std::make_pair(lhs_map_size + rhsfd.first, rhsfd.second));
     }
 
     // append proteinIdentification
     protein_identifications_.insert(protein_identifications_.end(),
                                     rhs.protein_identifications_.begin(),
-                                    rhs.protein_identifications_.end());    
+                                    rhs.protein_identifications_.end());
 
     // ensure non-redundant modification parameter
-    for (auto & pi : protein_identifications_)
+    for (auto& pi : protein_identifications_)
     {
       std::vector<String>::iterator it_2;
 
@@ -201,10 +204,13 @@ namespace OpenMS
       unassigned_peptide_identifications_.push_back(pid);
     }
 
+    // combine IDs (new format):
+    IdentificationData::RefTranslator trans = id_data_.merge(rhs.id_data_);
+
     // append consensusElements to consensusElementList and update map index:
     for (ConsensusFeature cf : rhs)
     {
-      for (PeptideIdentification & pid : cf.getPeptideIdentifications())
+      for (PeptideIdentification& pid : cf.getPeptideIdentifications())
       {
         if (pid.metaValueExists("map_index"))
         {
@@ -214,7 +220,7 @@ namespace OpenMS
       }
 
       // update map indices
-      ConsensusFeature::HandleSetType new_handles;      
+      ConsensusFeature::HandleSetType new_handles;
       for (auto handle : cf) // OMS_CODING_TEST_EXCLUDE Note: std::set only provides const iterators, so we copy
       {
         //since we only add a constant to the map_index, the set order will not change.
@@ -223,6 +229,9 @@ namespace OpenMS
       }
       cf.setFeatures(std::move(new_handles));
       new_handles.clear();
+
+      // update IDs (new format):
+      cf.updateIDReferences(trans);
 
       emplace_back(cf);
     }
@@ -258,6 +267,7 @@ namespace OpenMS
       protein_identifications_.clear();
       unassigned_peptide_identifications_.clear();
       data_processing_.clear();
+      id_data_.clear();
     }
   }
 
@@ -288,7 +298,7 @@ namespace OpenMS
       && experiment_type != "labeled_MS2")
     {
       throw Exception::IllegalArgument(__FILE__, __LINE__, OPENMS_PRETTY_FUNCTION,
-        "Unknown experiment type. " + experiment_type + ". Must be one of (label-free, labeled_MS1, labeled_MS2)");      
+        "Unknown experiment type. " + experiment_type + ". Must be one of (label-free, labeled_MS1, labeled_MS2)");
     }
     experiment_type_ = experiment_type;
   }
@@ -307,7 +317,7 @@ namespace OpenMS
 
   void ConsensusMap::sortByRT()
   {
-    std::stable_sort(begin(), end(), ConsensusFeature::RTLess()); 
+    std::stable_sort(begin(), end(), ConsensusFeature::RTLess());
   }
 
   void ConsensusMap::sortByMZ()
@@ -352,11 +362,11 @@ namespace OpenMS
 
       // moves IDs without meta value to end
       if (has_a && !has_b)
-      { 
+      {
         return true;
       }
       if (!has_a && has_b)
-      { 
+      {
         return false;
       }
 
@@ -371,8 +381,8 @@ namespace OpenMS
     };
 
     std::transform(begin(), end(), begin(),
-      [mapIndexLess](ConsensusFeature& c) 
-      { 
+      [mapIndexLess](ConsensusFeature& c)
+      {
         auto& pids = c.getPeptideIdentifications();
         stable_sort(pids.begin(), pids.end(), mapIndexLess);
         return c;
@@ -406,6 +416,7 @@ namespace OpenMS
     protein_identifications_.swap(from.protein_identifications_);
     unassigned_peptide_identifications_.swap(from.unassigned_peptide_identifications_);
     data_processing_.swap(from.data_processing_);
+    id_data_.swap(from.id_data_);
   }
 
   /// non-mutable access to the protein identifications
@@ -433,19 +444,19 @@ namespace OpenMS
   }
 
   /// non-mutable access to the unassigned peptide identifications
-  const std::vector<PeptideIdentification>& ConsensusMap::getUnassignedPeptideIdentifications() const
+  const PeptideIdentificationList& ConsensusMap::getUnassignedPeptideIdentifications() const
   {
     return unassigned_peptide_identifications_;
   }
 
   /// mutable access to the unassigned peptide identifications
-  std::vector<PeptideIdentification>& ConsensusMap::getUnassignedPeptideIdentifications()
+  PeptideIdentificationList& ConsensusMap::getUnassignedPeptideIdentifications()
   {
     return unassigned_peptide_identifications_;
   }
 
   /// sets the unassigned peptide identifications
-  void ConsensusMap::setUnassignedPeptideIdentifications(const std::vector<PeptideIdentification>& unassigned_peptide_identifications)
+  void ConsensusMap::setUnassignedPeptideIdentifications(const PeptideIdentificationList& unassigned_peptide_identifications)
   {
     unassigned_peptide_identifications_ = unassigned_peptide_identifications;
   }
@@ -478,21 +489,21 @@ namespace OpenMS
       {
         cd.second.filename = "UNKNOWN";
       }
-    } 
+    }
     else if (!column_description_.empty() && s.size() != column_description_.size())
     {
       throw Exception::InvalidParameter(__FILE__, __LINE__, OPENMS_PRETTY_FUNCTION,
-        "Number of MS runs paths (" + String(s.size()) + 
+        "Number of MS runs paths (" + String(s.size()) +
         ") must match number of columns (" + String(column_description_.size()) + ").");
     }
-    
+
     Size i(0);
     for (auto const & p : s)
     {
       if (!p.hasSuffix("mzML") && !p.hasSuffix("mzml"))
       {
         OPENMS_LOG_WARN << "To ensure tracability of results please prefer mzML files as primary MS run." << std::endl
-                        << "Filename: '" << p << "'" << std::endl;                          
+                        << "Filename: '" << p << "'" << std::endl;
       }
 
       column_description_[i].filename = p;
@@ -511,7 +522,7 @@ namespace OpenMS
     else
     {
       setPrimaryMSRunPath(s);
-    }        
+    }
   }
 
   void ConsensusMap::getPrimaryMSRunPath(StringList& toFill) const
@@ -520,7 +531,7 @@ namespace OpenMS
     for (auto const & fd : column_description_)
     {
       toFill.push_back(fd.second.filename);
-    }  
+    }
   }
 
   /// Equality operator
@@ -536,6 +547,7 @@ namespace OpenMS
            protein_identifications_ == rhs.protein_identifications_ &&
            unassigned_peptide_identifications_ == rhs.unassigned_peptide_identifications_ &&
            data_processing_ == rhs.data_processing_;
+    // @TODO: implement "operator==" for IdentificationData?
   }
 
   /// Equality operator
@@ -561,6 +573,14 @@ namespace OpenMS
 
   void ConsensusMap::updateRanges()
   {
+    #ifdef OPENMS_ASSERTIONS
+      double rt_min = RangeRT::isEmpty() ? 0 : getMinRT();
+      double rt_max = RangeRT::isEmpty() ? 0 : getMaxRT();
+      double mz_min = RangeMZ::isEmpty() ? 0 : getMinMZ();
+      double mz_max = RangeMZ::isEmpty() ? 0 : getMaxMZ();
+      double int_min = RangeIntensity::isEmpty() ? 0 : getMinIntensity();
+      double int_max = RangeIntensity::isEmpty() ? 0 : getMaxIntensity();
+    #endif
     clearRanges();
     // enlarge the range by the internal points of each feature
     for (const auto& cf : data_)
@@ -575,6 +595,24 @@ namespace OpenMS
         extendIntensity(handle.getIntensity());
       }
     }
+
+    #ifdef OPENMS_ASSERTIONS
+      // check if updateRanges() was necessary and find places where it was not
+      double rt_min_new = RangeRT::isEmpty() ? 0 : getMinRT();
+      double rt_max_new = RangeRT::isEmpty() ? 0 : getMaxRT();
+      double mz_min_new = RangeMZ::isEmpty() ? 0 : getMinMZ();
+      double mz_max_new = RangeMZ::isEmpty() ? 0 : getMaxMZ();
+      double int_min_new = RangeIntensity::isEmpty() ? 0 : getMinIntensity();
+      double int_max_new = RangeIntensity::isEmpty() ? 0 : getMaxIntensity();
+
+      // check if all are equal and no update range was necessary
+      if (rt_min_new == rt_min && rt_max_new == rt_max
+        && int_min_new == int_min && int_max_new == int_max
+        && mz_min_new == mz_min && mz_max_new == mz_max)
+      {
+        OPENMS_LOG_WARN << "Update ranges was called but ranges were already up-to-date" << std::endl;
+      }
+    #endif
   }
 
   bool ConsensusMap::isMapConsistent(Logger::LogStream* stream) const
@@ -601,7 +639,6 @@ OPENMS_THREAD_CRITICAL(LOGSTREAM)
       }
       return false;
     }
-
 
     // check map IDs
     for (Size i = 0; i < size(); ++i)
@@ -639,6 +676,8 @@ OPENMS_THREAD_CRITICAL(LOGSTREAM)
 
   std::vector<FeatureMap> ConsensusMap::split(ConsensusMap::SplitMeta mode) const
   {
+    // @TODO: handle IDs in new format (IdentificationData)
+
     Size numbr_exps = column_description_.size();
     std::vector<FeatureMap>fmaps(numbr_exps);
 
@@ -762,6 +801,39 @@ OPENMS_THREAD_CRITICAL(LOGSTREAM)
       }
       return 1;
     }
+  }
+
+  std::set<IdentificationDataInternal::ObservationMatchRef> ConsensusMap::getUnassignedIDMatches() const
+  {
+    std::set<IdentificationData::ObservationMatchRef> all_matches;
+    for (auto it = id_data_.getObservationMatches().begin();
+         it != id_data_.getObservationMatches().end(); ++it)
+    {
+      all_matches.insert(it);
+    }
+    std::set<IdentificationData::ObservationMatchRef> assigned_matches;
+    for (const ConsensusFeature& feat : *this)
+    {
+      assigned_matches.insert(feat.getIDMatches().begin(), feat.getIDMatches().end());
+      // @TODO: consider subordinate features? - probably not
+    }
+    std::set<IdentificationData::ObservationMatchRef> result;
+    std::set_difference(all_matches.begin(), all_matches.end(),
+                        assigned_matches.begin(), assigned_matches.end(),
+                        inserter(result, result.end()));
+    return result;
+  }
+
+
+  const IdentificationData& ConsensusMap::getIdentificationData() const
+  {
+    return id_data_;
+  }
+
+
+  IdentificationData& ConsensusMap::getIdentificationData()
+  {
+    return id_data_;
   }
 
 } // namespace OpenMS

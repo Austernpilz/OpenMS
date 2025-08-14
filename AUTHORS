@@ -2,9 +2,11 @@
                  OpenMS -- Open Source Mass Spectrometry
 =========================================================================
 
-The following authors contributed to OpenMS at some point. For the 
+The following authors contributed to OpenMS at some point. For the
 authors contributing to a specific piece of code, please refer to
 the authors tag in the respective file header.
+ - Achal Bajpai
+ - Aditya Muzumdar
  - Ahmed Khalil
  - Alexandra Scherbart
  - Axel Walter
@@ -16,6 +18,7 @@ the authors tag in the respective file header.
  - Anton Pervukhin
  - Bastian Blank
  - Chenghao Zhu
+ - Chirag Dave
  - Chris Bauer
  - Chris Bielow
  - Christian Ehrlich
@@ -48,11 +51,13 @@ the authors tag in the respective file header.
  - Holger Franken
  - Holger Plattfaut
  - Immanuel Luhn
- - Jang Jang Jin 
+ - Jang Jang Jin
+ - Jeremi Maciejewski
  - Jihyung Kim
  - Johan Teleman
  - Johannes Junker
  - Johannes Veit
+ - Johannes von Kleist
  - Joshua Charkow
  - Julia Thueringer
  - Juliane Schmachtenberg
@@ -76,21 +81,29 @@ the authors tag in the respective file header.
  - Manuel Zschäbitz
  - Mateusz Łącki
  - Mathias Walzer
+ - Matteo Pilz
  - Matthew The
  - Matthias Bernt
+ - Michael R. Crusoe
  - Michał Startek
+ - Mohamed Ali
  - Nico Pfeifer
  - Ole Schulz-Trieglaff
  - Oliver Alka
  - Oliver Kohlbacher
  - Pasquale Domenico Colaianni
  - Patricia Scheil
+ - Peter Jones
  - Peter Kunszt
  - Petra Gutenbrunner
+ - Radu Suciu
+ - Ralf Gabriels
  - Rene Hussong
+ - Rick Helmus
  - Ruben Grünberg
  - Samuel Wein
  - Sandro Andreotti
+ - Simon Gene Gottlieb
  - Steffen Sass
  - Stephan Aiche
  - Sven Nahnsen
@@ -101,6 +114,7 @@ the authors tag in the respective file header.
  - Timo Sachsenberg
  - Tinatin Kasradze
  - Till Englert
+ - Tom David Müller
  - Tom Lukas Lankenau
  - Tom Waschischeck
  - Uwe Schmitt
@@ -111,4 +125,4 @@ the authors tag in the respective file header.
  - Volker Mosthaf
  - Witold Wolski
  - Xiao Liang
- - Radu Suciu
+ - Yasset Perez-Riverol

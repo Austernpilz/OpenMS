@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Hendrik Weisser $
@@ -35,13 +9,33 @@
 #include <OpenMS/CHEMISTRY/RibonucleotideDB.h>
 #include <OpenMS/CONCEPT/LogStream.h>
 #include <OpenMS/SYSTEM/File.h>
-#include <QFile>
-#include <QTextStream>
+#include <QtCore/QFile>
+#include <QtCore/QTextStream>
 #include <nlohmann/json.hpp>
 
-
+// This is the only place wherein Nlohmann/json is used. It is updating its requirements to work with explicit 
+// conversions only.
 using namespace std;
+/// @brief Specialize nlohmann::adl_serializer for OpenMS::EmpiricalFormula so that nlohmann::json
+// knows how to (de)serialize it: from_json constructs an EmpiricalFormula from a JSON string,to_json 
+// converts it back to its string form, all explicitly.
+namespace nlohmann {
+//   
+    template <>
+    struct adl_serializer<OpenMS::EmpiricalFormula>
+    {
+        static void from_json(const json& j, OpenMS::EmpiricalFormula& ef)
+        {
+            std::string formula_string = j.get<std::string>();
+            ef = OpenMS::EmpiricalFormula(formula_string);
+        }
 
+        static void to_json(json& j, const OpenMS::EmpiricalFormula& ef)
+        {
+            j = ef.toString();
+        }
+    };
+}
 namespace OpenMS
 {
   // A structure for storing a pointer to a ribo in the database, as well as the possible alternatives if it is ambiguous (eg a methyl group that for which we can't determine the localization)
@@ -57,8 +51,12 @@ namespace OpenMS
   {
     // Modomics mods were retreived from https://www.genesilico.pl/modomics/api/modifications
     readFromJSON_("CHEMISTRY/Modomics.json");
+    OPENMS_LOG_DEBUG << "Loading modomics RNA Modifications from "<< File::find("CHEMISTRY/Modomics.json") <<"\n";
+    
     // We still use the old tsv format for custom mods
     readFromFile_("CHEMISTRY/Custom_RNA_modifications.tsv");
+    OPENMS_LOG_DEBUG << "Loading custom RNA Modifications from "<< File::find("CHEMISTRY/Custom_RNA_modifications.tsv") <<"\n";
+    
     if (File::exists("CHEMISTRY/User_Modifications.tsv"))
     {
       OPENMS_LOG_INFO << "Loading user specified Modifications from TSV\n";
@@ -71,11 +69,7 @@ namespace OpenMS
 
   RibonucleotideDB* RibonucleotideDB::getInstance()
   {
-    static RibonucleotideDB* db_ = nullptr;
-    if (db_ == nullptr)
-    {
-      db_ = new RibonucleotideDB;
-    }
+    static RibonucleotideDB* db_ = new RibonucleotideDB(); // Meyers' singleton -> thread safe
     return db_;
   }
 
@@ -116,7 +110,7 @@ namespace OpenMS
     // If we have an explicitly defined baseloss_formula
     if (auto e = entry.find("baseloss_formula"); e != entry.cend() && !e->is_null())
     {
-      return EmpiricalFormula(*e);
+      return EmpiricalFormula(e->get<std::string>());
     }
     //TODO: Calculate base loss formula from SMILES
     else // If we don't have a defined baseloss_formula calculate it from our shortCode
@@ -148,9 +142,9 @@ namespace OpenMS
   ParsedEntry_ parseEntry_(const nlohmann::json::value_type& entry)
   {
     ParsedEntry_ parsed;
-    unique_ptr<Ribonucleotide> ribo (new Ribonucleotide());
-    ribo->setName(entry.at("name"));
-    String code = entry.at("short_name");
+    auto ribo = std::make_unique<Ribonucleotide>();
+    ribo->setName(entry.at("name").template get<std::string>());
+    String code = entry.at("short_name").get<std::string>();
     ribo->setCode(code);
     // NewCode doesn't exist any more, we use the same shortname for compatibility
     ribo->setNewCode(code);
@@ -188,14 +182,15 @@ namespace OpenMS
     {
       ribo->setHTMLCode(entry.at("abbrev")); //This is the single letter unicode representation that only SOME mods have
     }
-    ribo->setFormula(EmpiricalFormula(entry.at("formula")));
-    if ( !(entry.find("mass_avg") == entry.cend()) && !(entry.at("mass_avg").is_null()))
+    ribo->setFormula(entry.at("formula").get<OpenMS::EmpiricalFormula>());
+
+    if (auto e = entry.find("mass_avg"); e != entry.cend() && !e->is_null())
     {
-      ribo->setAvgMass(entry.at("mass_avg"));
+      ribo->setAvgMass(e->get<double>());
     }
     if (std::abs(ribo->getAvgMass() - ribo->getFormula().getAverageWeight()) >= 0.01)
     {
-      OPENMS_LOG_WARN << "Average mass of " << code << " differs substantially from its formula mass.\n";
+      OPENMS_LOG_DEBUG << "Average mass of " << code << " differs substantially from its formula mass.\n";
     }
 
     if (auto e = entry.find("mass_monoiso"); e != entry.cend() && !e->is_null())
@@ -209,7 +204,7 @@ namespace OpenMS
     }
     if ( std::abs(ribo->getMonoMass() - ribo->getFormula().getMonoWeight()) >= 0.01)
     {
-      OPENMS_LOG_WARN << "Average mass of " << code << " differs substantially from its formula mass.\n";
+      OPENMS_LOG_DEBUG << "Average mass of " << code << " differs substantially from its formula mass.\n";
     }
 
     // Handle base loss formula
@@ -245,7 +240,7 @@ namespace OpenMS
     }
 
     QTextStream source(&file);
-    source.setCodec("UTF-8");
+    source.setAutoDetectUnicode(true);
     Size line_count = 0;
     json mod_obj;
     try
@@ -257,7 +252,6 @@ namespace OpenMS
       OPENMS_LOG_ERROR << "Error: Failed to parse Modomics JSON. Reason:\n" << e.getName() << " - " << e.what() << endl;
       throw;
     }
-    QChar prime(0x2032); // Unicode "prime" character
     for (auto& element : mod_obj)
     {
       line_count++;
@@ -303,7 +297,7 @@ namespace OpenMS
     }
 
     QTextStream source(&file);
-    source.setCodec("UTF-8");
+    source.setAutoDetectUnicode(true);
     Size line_count = 1;
     String line = source.readLine();
     while (line[0] == '#') // skip leading comments

@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Eugen Netz $
@@ -40,6 +14,7 @@
 #include <OpenMS/FORMAT/FASTAFile.h>
 #include <OpenMS/CHEMISTRY/EnzymaticDigestion.h>
 #include <OpenMS/CHEMISTRY/ModifiedPeptideGenerator.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 #include <numeric>
 
 namespace OpenMS
@@ -125,10 +100,6 @@ namespace OpenMS
        * @param fixed_modifications The list of fixed modifications
        * @param variable_modifications The list of variable modifications
        * @param max_variable_mods_per_peptide The maximal number of variable modifications per peptide
-       * @param count_proteins A variable to keep track of the number of proteins in the database. Should be an externally declared variable and = 0 when calling this function.
-       * @param count_peptides A variable to keep track of the number of peptides after digestion. Should be an externally declared variable and = 0 when calling this function.
-       * @param n_term_linker True, if the cross-linker can react with the N-terminal of a protein
-       * @param c_term_linker True, if the cross-linker can react with the C-terminal of a protein
        * @return A vector of AASeqWithMass containing the peptides, their masses and information about terminal peptides
        */
       static std::vector<OPXLDataStructs::AASeqWithMass> digestDatabase(std::vector<FASTAFile::FASTAEntry> fasta_db,
@@ -140,16 +111,16 @@ namespace OpenMS
       /**
        * @brief Builds specific cross-link candidates with all possible combinations of linked positions from peptide pairs. Used to build candidates for the precursor mass window of a single MS2 spectrum.
        * @param candidates The XLPrecursors containing indices of two peptides
+       * @param precursor_corrections Same size as @p candidates
+       * @param precursor_correction_positions Same size as @p candidates; A vector of the position of the used precursor correction
        * @param peptide_masses The digested peptide database, that the indices in the XLPrecursors refer to
        * @param cross_link_residue1 A list of residues, to which the first side of the linker can react
        * @param cross_link_residue2 A list of residues, to which the second side of the linker can react
        * @param cross_link_mass mass of the cross-linker, only the light one if a labeled linker is used
        * @param cross_link_mass_mono_link A list of possible masses for the cross-link, if it is attached to a peptide on one side
-       * @param precursor_mass The precursor mass of the experimental spectrum (used to filter out certain candidates, e.g. mono- and loop-links have a different mass)
-       * @param allowed_error The maximal precursor mass error in Da
+       * @param spectrum_precursor_vector  The precursor masses of the experimental spectrum (used to filter out certain candidates, e.g. mono- and loop-links have a different mass)
+       * @param allowed_error_vector Allowed mass error in Da for the respective precursor in @p spectrum_precursor_vector.
        * @param cross_link_name The name of the cross-linker
-       * @param n_term_linker True, if the cross-linker can react with the N-terminal of a protein
-       * @param c_term_linker True, if the cross-linker can react with the C-terminal of a protein
        * @return A vector of ProteinProteinCrossLink candidates containing all necessary information to generate theoretical spectra
        */
       static std::vector <OPXLDataStructs::ProteinProteinCrossLink> buildCandidates(const std::vector< OPXLDataStructs::XLPrecursor > & candidates,
@@ -188,35 +159,47 @@ namespace OpenMS
        * @param scan_index The index of the current spectrum
        * @param scan_index_heavy The index of the heavy spectrum in a spectrum pair with labeled linkers
        */
-      static void buildPeptideIDs(std::vector<PeptideIdentification> & peptide_ids, const std::vector< OPXLDataStructs::CrossLinkSpectrumMatch > & top_csms_spectrum, std::vector< std::vector< OPXLDataStructs::CrossLinkSpectrumMatch > > & all_top_csms, Size all_top_csms_current_index, const PeakMap & spectra, Size scan_index, Size scan_index_heavy);
+      static void buildPeptideIDs(PeptideIdentificationList & peptide_ids, const std::vector< OPXLDataStructs::CrossLinkSpectrumMatch > & top_csms_spectrum, std::vector< std::vector< OPXLDataStructs::CrossLinkSpectrumMatch > > & all_top_csms, Size all_top_csms_current_index, const PeakMap & spectra, Size scan_index, Size scan_index_heavy);
 
       /**
        * @brief adds MetaValues for cross-link positions to PeptideHits
        * @param peptide_ids The vector of peptide_ids containing XL-MS search results with alpha and beta PeptideHits, after mapping of peptides to proteins
        */
       static void addProteinPositionMetaValues(std::vector< PeptideIdentification > & peptide_ids);
+      
+      /// @overload
+      static void addProteinPositionMetaValues(PeptideIdentificationList & peptide_ids);
 
       /**
        * @brief adds xl_target_decoy MetaValue that combines alpha and beta target_decoy info
        * @param peptide_ids The vector of peptide_ids containing XL-MS search results with alpha and beta PeptideHits, after mapping of peptides to proteins
        */
       static void addXLTargetDecoyMV(std::vector< PeptideIdentification > & peptide_ids);
+      
+      /// @overload
+      static void addXLTargetDecoyMV(PeptideIdentificationList & peptide_ids);
 
       /**
        * @brief adds accessions_beta MetaValue to alpha peptides for TOPPView visualization and CSV table output
        * @param peptide_ids The vector of peptide_ids containing XL-MS search results with alpha and beta PeptideHits, after mapping of peptides to proteins
        */
       static void addBetaAccessions(std::vector< PeptideIdentification > & peptide_ids);
+      
+      /// @overload
+      static void addBetaAccessions(PeptideIdentificationList & peptide_ids);
 
       /**
        * @brief removes beta peptides from cross-link IDs, since all info is already contained in the alpha peptide hits
        * @param peptide_ids The vector of peptide_ids containing XL-MS search results with alpha and beta PeptideHits
        */
       static void removeBetaPeptideHits(std::vector< PeptideIdentification > & peptide_ids);
+      
+      /// @overload
+      static void removeBetaPeptideHits(PeptideIdentificationList & peptide_ids);
 
       /**
-       * @brief adds the list of features that percolator should use for OpenPepXL
-       * @param search_params The search parameters of OpenPepXL
+       * @brief Adds the list of features that percolator should use for OpenPepXL
+       * @param prot_id Receives updated search parameters ('feature_extractor' and 'extra_features') as meta value for OpenPepXL
        */
       static void addPercolatorFeatureList(ProteinIdentification& prot_id);
 
@@ -225,6 +208,9 @@ namespace OpenMS
        * @param peptide_ids The vector of peptide_ids containing XL-MS search results without beta PeptideHits
        */
       static void computeDeltaScores(std::vector< PeptideIdentification >& peptide_ids);
+      
+      /// @overload
+      static void computeDeltaScores(PeptideIdentificationList & peptide_ids);
 
       /**
        * @brief combines all hits to spectrum pairs with the same light spectrum into one ranked list
@@ -237,6 +223,9 @@ namespace OpenMS
        * @param number_top_hits The chosen number of reported top hits
        */
       static std::vector< PeptideIdentification > combineTopRanksFromPairs(std::vector< PeptideIdentification > & peptide_ids, Size number_top_hits);
+      
+      /// @overload
+      static std::vector< PeptideIdentification > combineTopRanksFromPairs(PeptideIdentificationList & peptide_ids, Size number_top_hits);
 
       /**
        * @brief Searches for cross-link candidates for a MS/MS spectrum
@@ -280,18 +269,20 @@ namespace OpenMS
       static double computePrecursorError(const OPXLDataStructs::CrossLinkSpectrumMatch& csm, double precursor_mz, int precursor_charge);
 
       /**
-       * @brief Computes the mass error of a precursor mass to a hit
-
-       * @param csm The cross-link spectrum match containing the hit
-       * @param precursor_mz The precursor mz of the MS/MS spectrum
-       * @param precursor_charge The charge of the precursor
+       * @brief Computes the mean of alpha, beta, xlinks-alpha and xlinks-beta respectively and store means in @p csm
        */
-      static void isoPeakMeans(OPXLDataStructs::CrossLinkSpectrumMatch& csm, DataArrays::IntegerDataArray& num_iso_peaks_array, std::vector< std::pair< Size, Size > >& matched_spec_linear_alpha, std::vector< std::pair< Size, Size > >& matched_spec_linear_beta, std::vector< std::pair< Size, Size > >& matched_spec_xlinks_alpha, std::vector< std::pair< Size, Size > >& matched_spec_xlinks_beta);
+      static void isoPeakMeans(OPXLDataStructs::CrossLinkSpectrumMatch& csm, 
+                               const DataArrays::IntegerDataArray& num_iso_peaks_array,
+                               const std::vector< std::pair< Size, Size > >& matched_spec_linear_alpha,
+                               const std::vector< std::pair< Size, Size > >& matched_spec_linear_beta,
+                               const std::vector< std::pair< Size, Size > >& matched_spec_xlinks_alpha,
+                               const std::vector< std::pair< Size, Size > >& matched_spec_xlinks_beta);
 
       /**
        * @brief Filters the list of candidates for cases that include at least one of the tags in at least one of the two sequences
 
        * @param candidates The list of XLPrecursors as enumerated by e.g. enumerateCrossLinksAndMasses
+       * @param precursor_correction_positions 
        * @param tags The list of tags for the current spectrum produced by the Tagger
        */
       static void filterPrecursorsByTags(std::vector <OPXLDataStructs::XLPrecursor>& candidates, std::vector< int >& precursor_correction_positions, const std::vector<std::string>& tags);

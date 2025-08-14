@@ -1,31 +1,5 @@
-// --------------------------------------------------------------------------
-//                   OpenMS -- Open-Source Mass Spectrometry
-// --------------------------------------------------------------------------
-// Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
-//
-// This software is released under a three-clause BSD license:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of any author or any participating institution
-//    may be used to endorse or promote products derived from this software
-//    without specific prior written permission.
-// For a full list of authors, refer to the file AUTHORS.
-// --------------------------------------------------------------------------
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL ANY OF THE AUTHORS OR THE CONTRIBUTING
-// INSTITUTIONS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-// OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-// ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2002-present, OpenMS Inc. -- EKU Tuebingen, ETH Zurich, and FU Berlin
+// SPDX-License-Identifier: BSD-3-Clause
 //
 // --------------------------------------------------------------------------
 // $Maintainer: Timo Sachsenberg $
@@ -40,6 +14,7 @@
 #include <OpenMS/MATH/STATISTICS/GumbelDistributionFitter.h>
 #include <OpenMS/MATH/STATISTICS/GumbelMaxLikelihoodFitter.h>
 #include <OpenMS/MATH/STATISTICS/GaussFitter.h>
+#include <OpenMS/METADATA/PeptideIdentificationList.h>
 
 #include <vector>
 #include <map>
@@ -51,6 +26,7 @@ namespace OpenMS
   class PeptideIdentification;
   class ProteinIdentification;
   class PeptideHit;
+  class PeptideIdentificationList;
   namespace Math
   {
 
@@ -67,7 +43,7 @@ namespace OpenMS
       @todo allow semi-supervised by using decoy annotations
       @todo allow non-parametric via kernel density estimation
 
-      @htmlinclude OpenMS_Math::PosteriorErrorProbabilityModel.parameters
+      @htmlinclude OpenMS_PosteriorErrorProbabilityModel.parameters
 
       @ingroup Math
     */
@@ -91,11 +67,11 @@ public:
        * @param target_decoy_available whether target decoy information is stored as meta value
        * @param fdr_for_targets_smaller fdr threshold for targets
        * @return engine (and optional charge state) id -> vector of triplets (score, target, decoy)
-       * @note supported engines are: XTandem,OMSSA,MASCOT,SpectraST,MyriMatch,SimTandem,MSGFPlus,MS-GF+,Comet
+       * @note supported engines are: XTandem,OMSSA,MASCOT,SpectraST,MyriMatch,SimTandem,MSGFPlus,MS-GF+,Comet,Sage
        */
       static std::map<String, std::vector<std::vector<double>>> extractAndTransformScores(
         const std::vector<ProteinIdentification> & protein_ids,
-        const std::vector<PeptideIdentification> & peptide_ids,
+        const PeptideIdentificationList & peptide_ids,
         const bool split_charge,
         const bool top_hits_only,
         const bool target_decoy_available,
@@ -121,7 +97,7 @@ public:
         const bool prob_correct,
         const bool split_charge,
         std::vector<ProteinIdentification> & protein_ids,
-        std::vector<PeptideIdentification> & peptide_ids,
+        PeptideIdentificationList & peptide_ids,
         bool & unable_to_fit_data,
         bool & data_might_not_be_well_fit);
 
@@ -130,16 +106,18 @@ public:
           computeProbability can be used afterwards.
           Uses two Gaussians to fit. And Gauss+Gauss or Gumbel+Gauss to plot and calculate final probabilities.
           @param search_engine_scores a vector which holds the data points
+          @param outlier_handling Valid values are in the Param 'outlier_handling'
           @return true if algorithm has run through. Else false will be returned. In that case no plot and no probabilities are calculated.
           @note the vector is sorted from smallest to biggest value!
       */
-      bool fit(std::vector<double> & search_engine_scores, const String& outlier_handling);
+      bool fit(std::vector<double>& search_engine_scores, const String& outlier_handling);
 
       /**
           @brief fits the distributions to the data points(search_engine_scores). Estimated parameters for the distributions are saved in member variables.
           computeProbability can be used afterwards.
           Uses Gumbel+Gauss for everything. Fits Gumbel by maximizing log likelihood.
           @param search_engine_scores a vector which holds the data points
+          @param outlier_handling Valid values are in the Param 'outlier_handling'
           @return true if algorithm has run through. Else false will be returned. In that case no plot and no probabilities are calculated.
           @note the vector is sorted from smallest to biggest value!
       */
@@ -148,11 +126,12 @@ public:
       /**
           @brief fits the distributions to the data points(search_engine_scores) and writes the computed probabilities into the given vector (the second one).
           @param search_engine_scores a vector which holds the data points
-          @param probabilities a vector which holds the probability for each data point after running this function. If it has some content it will be overwritten.
+          @param[out] probabilities Probability for each data point after running this function. If it has some content it will be overwritten.
+          @param outlier_handling Valid values are in the Param 'outlier_handling'
           @return true if algorithm has run through. Else false will be returned. In that case no plot and no probabilities are calculated.
           @note the vectors are sorted from smallest to biggest value!
       */
-      bool fit(std::vector<double> & search_engine_scores, std::vector<double> & probabilities, const String& outlier_handling);
+      bool fit(std::vector<double>& search_engine_scores, std::vector<double>& probabilities, const String& outlier_handling);
 
       ///Writes the distributions densities into the two vectors for a set of scores. Incorrect_densities represent the incorrectly assigned sequences.
       void fillDensities(const std::vector<double> & x_scores, std::vector<double> & incorrect_density, std::vector<double> & correct_density);
@@ -164,9 +143,11 @@ public:
       double computeLogLikelihood(const std::vector<double> & incorrect_density, const std::vector<double> & correct_density) const;
       
       /**computes the posteriors for the datapoints to belong to the incorrect distribution
-       * @param incorrect_posterior resulting posteriors
-       * @return the log-likelihood of the model
-       */
+        @param[in] incorrect_log_density ...
+        @param[in] correct_log_density ...
+        @param[out] incorrect_posterior resulting posteriors; same size as @p incorrect_log_density
+        @return the log-likelihood of the model
+      */
       double computeLLAndIncorrectPosteriorsFromLogDensities(
           const std::vector<double>& incorrect_log_density,
           const std::vector<double>& correct_log_density,
@@ -184,12 +165,13 @@ public:
       /**
        * @param x_scores Scores observed "on the x-axis"
        * @param incorrect_posteriors Posteriors/responsibilities of belonging to the incorrect component
+       * @param pos_neg_mean Positive(correct) and negative(incorrect) means, respectively
        * @return New estimate for the std. deviation of the correct (pair.first) and incorrect (pair.second) component
        * @note only for Gaussian estimates
        */
       std::pair<double, double> pos_neg_sigma_weighted_posteriors(const std::vector<double> &x_scores,
                                                                  const std::vector<double> &incorrect_posteriors,
-                                                                 const std::pair<double, double>& means);
+                                                                 const std::pair<double, double>& pos_neg_mean);
 
       ///returns estimated parameters for correctly assigned sequences. Fit should be used before.
       GaussFitter::GaussFitResult getCorrectlyAssignedFitResult() const

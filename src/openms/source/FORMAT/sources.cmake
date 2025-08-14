@@ -37,7 +37,6 @@ IndexedMzMLFileLoader.cpp
 InspectInfile.cpp
 InspectOutfile.cpp
 KroenikFile.cpp
-LibSVMEncoder.cpp
 MRMFeaturePickerFile.cpp
 MRMFeatureQCFile.cpp
 MS2File.cpp
@@ -45,7 +44,6 @@ MSNumpressCoder.cpp
 MSPFile.cpp
 MSPGenericFile.cpp
 MSstatsFile.cpp
-MascotInfile.cpp
 MascotGenericFile.cpp
 MascotRemoteQuery.cpp
 MascotXMLFile.cpp
@@ -54,7 +52,6 @@ MzDataFile.cpp
 MzIdentMLFile.cpp
 MzMLFile.cpp
 MzQCFile.cpp
-MzQuantMLFile.cpp
 MzTab.cpp
 MzTabBase.cpp
 MzTabM.cpp
@@ -68,6 +65,8 @@ OMSSACSVFile.cpp
 OMSSAXMLFile.cpp
 OSWFile.cpp
 ParamCTDFile.cpp
+ParamCWLFile.cpp
+ParamJSONFile.cpp
 ParamXMLFile.cpp
 PTMXMLFile.cpp
 PeakTypeEstimator.cpp
