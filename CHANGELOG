@@ -32,6 +32,8 @@ TOPP tools:
       - support for Bruker Ion Mobility (experimental). Note: requires IM peak picked data.
     NucleicAcidSearchEngine:
       - add support for global fixed modifications as a search parameter
+    Digestor:
+      - supports replacing ambiguous amino acids (X,B,J,Z) in the FASTA input with random unambiguous amino acids in the output (#8167)
     all:
       - show load/store progress for files in all TOPP tools (#8041)
   Added Tools:
@@ -44,7 +46,11 @@ GUI tools:
  
 
 OpenMS Library:
-  Fixes:
+  Added:
+    - PeptideHit: Added TargetDecoyType (TARGET, DECOY, TARGET_DECOY, UNKNOWN) and setTargetDecoyType()/getTargetDecoyType(); supports target+decoy peptide hits.
+    - IDScoreSwitcherAlgorithm: Added findScoreType() method for generic score type detection. Checks if main score matches requested ScoreType (PEP, QVAL, FDR, etc.) or finds it in meta values..
+    - ProteinHit: Added TargetDecoyType (TARGET, DECOY, UNKNOWN) and setTargetDecoyType()/getTargetDecoyType().
+    - Both: Added isDecoy().
     - unify isotopic distributions (coarse vs. fine) for EmpiricalFormulas with charge (#8099)
   Changes:
     - removed `assignRanks` and `sortByRanks` in PeptideIdentifications and sort and filter by score instead. Also removed `updateHitRanks` in IDFilter (#7991)
@@ -54,6 +60,9 @@ OpenMS Library:
   New Features:
     - added `EnzymaticDigestion.semiSpecificDigestion_()`
     - ProteaseDigestion: add support for semi-specific digestion (#8130)
+    - TransformationModelLowess: Add option to automate span selection via cross-validation (#8166)
+    - OpenSwath:
+      - Added automated iRT calibration using input transition list (#8146)
 
 
 
